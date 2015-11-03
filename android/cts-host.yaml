@@ -39,7 +39,7 @@ params:
 
 run:
     steps:
-        - wget http://testdata.validation.linaro.org/apks/workload-automation/build-tools.tar.gz
+        - wget http://people.linaro.org/~tyler.baker/build-tools.tar.gz
         - tar zxvf build-tools.tar.gz
         - AAPT_HOME=`pwd`/build-tools
         - PATH=${AAPT_HOME}/android-4.4/:${PATH}
