@@ -1,0 +1,26 @@
+metadata:
+    name: display-capture
+    format: "Lava-Test-Shell Test Definition 1.0"
+    description: "Display Capture"
+    maintainer:
+        - tyler.baker@linaro.org
+    os:
+        - ubuntu
+    scope:
+        - functional
+    environment:
+        - lava-test-shell
+
+install:
+    deps:
+        - curl
+
+params:
+    CAMERA_HOST: 'linaro@192.168.1.7'
+
+run:
+    steps:
+        - "curl https://git.linaro.org/lava/lava-dispatcher.git/blob_plain/HEAD:/lava_dispatcher/device/dynamic_vm_keys/lava > ~/.ssh/id_rsa"
+        - "chmod 600 ~/.ssh/id_rsa"
+        - "cd ubuntu/scripts/"
+        - "./capture-photo.sh $CAMERA_HOST"
