@@ -20,6 +20,7 @@ params:
 
 run:
     steps:
+        - "mkdir ~/.ssh"
         - "curl https://git.linaro.org/lava/lava-dispatcher.git/blob_plain/HEAD:/lava_dispatcher/device/dynamic_vm_keys/lava > ~/.ssh/id_rsa"
         - "chmod 600 ~/.ssh/id_rsa"
         - "cd ubuntu/scripts/"
