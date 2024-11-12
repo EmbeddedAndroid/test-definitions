@@ -18,5 +18,6 @@ metadata:
 run:
         steps:
                 - cd ./automated/linux/arch-timer
+                - chmod a+x arch-timer.sh
                 - ./arch-timer.sh
                 - ../../utils/send-to-lava.sh ./output/result.txt
