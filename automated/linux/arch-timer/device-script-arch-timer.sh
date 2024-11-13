@@ -25,7 +25,7 @@ done
 
 # Print result
 if $pass; then
-    echo "PASS"
+    echo "arch-timer PASS"
 else
-    echo "FAIL"
+    echo "arch-timer FAIL"
 fi
