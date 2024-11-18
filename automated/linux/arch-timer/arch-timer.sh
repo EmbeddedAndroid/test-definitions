@@ -13,7 +13,8 @@ export RESULT_FILE
 
 sudo mkdir -p "${HOST_OUTPUT}"
 
-adb_push "./device-script-arch-timer.sh" "/var/persist"
+ls -ltrh
+# adb_push "./device-script-arch-timer.sh" "/var/persist"
 
 info_msg "About to run arch timer test on device"
-adb shell "/var/persist/device-script-arch-timer.sh" | sudo tee "${RESULT_FILE}"
+sh /var/persist/device-script-arch-timer.sh | tee "${RESULT_FILE}"
