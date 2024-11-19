@@ -11,7 +11,7 @@ export RESULT_FILE
 # shellcheck disable=SC1091
 . ../../lib/android-test-lib
 
-sudo mkdir -p "${HOST_OUTPUT}"
+mkdir -p "${HOST_OUTPUT}"
 
 ls -ltrh
 # adb_push "./device-script-arch-timer.sh" "/var/persist"
