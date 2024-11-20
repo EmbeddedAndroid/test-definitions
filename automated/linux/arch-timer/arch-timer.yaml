@@ -19,5 +19,6 @@ run:
         steps:
                 - cd ./automated/linux/arch-timer
                 - chmod a+x arch-timer.sh
+                - cat /proc/interrupts | grep arch_timer
                 - ./arch-timer.sh
                 - ../../utils/send-to-lava.sh ./output/result.txt
