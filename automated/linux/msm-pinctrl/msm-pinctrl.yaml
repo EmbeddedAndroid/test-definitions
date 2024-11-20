@@ -1,0 +1,23 @@
+metadata:
+        name: msm-pinctrl
+        format: "Lava-Test Test Definition 1.0"
+        description: "Compare arch timer after an interval of 10 seconds"
+        maintainer:
+                - ryan.harkin@linaro.org
+        os:
+                - debian
+                - ubuntu
+                - fedora
+                - centos
+                - oe
+        scope:
+                - functional
+        devices:
+                - rzn1d
+
+run:
+        steps:
+                - cd ./automated/linux/msm-pinctrl
+                - chmod a+x msm-pinctrl.sh
+                - ./msm-pinctrl.sh
+                - ../../utils/send-to-lava.sh ./output/result.txt
