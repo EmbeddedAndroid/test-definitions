@@ -21,5 +21,6 @@ run:
                 - chmod a+x arch-timer.sh
                 - cat /proc/interrupts | grep arch_timer
                 - uname -a
+                - cat /proc/interrupts | grep arch_timer | awk '{print $2, $3, $4, $5, $6, $7, $8, $9}'
                 - ./arch-timer.sh
                 - ../../utils/send-to-lava.sh ./output/result.txt
