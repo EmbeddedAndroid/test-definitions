@@ -17,4 +17,4 @@ ls -ltrh
 # adb_push "./device-script-arch-timer.sh" "/var/persist"
 
 info_msg "About to run arch timer test on device"
-sh device-script-arch-timer.sh | tee "${RESULT_FILE}"
+sh -x device-script-arch-timer.sh | tee "${RESULT_FILE}"
