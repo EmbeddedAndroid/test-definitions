@@ -1,5 +1,5 @@
 metadata:
-        name: dmesg-iommu
+        name: dmesg-smmu
         format: "Lava-Test Test Definition 1.0"
         description: "Compare arch timer after an interval of 10 seconds"
         maintainer:
@@ -17,7 +17,7 @@ metadata:
 
 run:
         steps:
-                - cd ./automated/linux/dmesg-iommu
-                - chmod a+x dmesg-iommu.sh
-                - ./dmesg-iommu.sh
+                - cd ./automated/linux/dmesg-smmu
+                - chmod a+x dmesg-smmu.sh
+                - ./dmesg-smmu.sh
                 - ../../utils/send-to-lava.sh ./output/result.txt

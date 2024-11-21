@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # Execute the command and store the output
-output=$(dmesg | grep iommu)
+output=$(dmesg | grep smmu)
 
 # Check if the output is empty
 if [ -z "$output" ]; then
-    echo "dmesg-iommu FAIL"
+    echo "dmesg-smmu FAIL"
 else
-    echo "dmesg-iommu PASS"
+    echo "dmesg-smmu PASS"
 fi
