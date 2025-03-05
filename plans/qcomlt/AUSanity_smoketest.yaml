@@ -1,0 +1,23 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: kernel-smoke-tests
+    description: "Run kernel smoke tests."
+    maintainer:
+        - vnarapar@qti.qualcomm.com
+    os:
+        - openembedded
+    scope:
+        - functional
+    devices:
+        - rb3gen2
+
+run:
+    steps:
+        - ls -l
+        - pwd
+        - $PWD/automated/linux/cpu-online/hotplug.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cpu-online/output/result.txt || true
+        - $PWD/automated/linux/storage/storage.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/storage/output/result.txt || true
+        - $PWD/automated/linux/Interrupts/interrupt.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/Interrupts/output/result.txt || true
