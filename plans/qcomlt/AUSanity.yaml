@@ -1,7 +1,7 @@
 metadata:
     format: Lava-Test Test Definition 1.0
-    name: kernel-smoke-tests
-    description: "Run kernel smoke tests."
+    name: AUSanity
+    description: "Baseline AU Sanity test plan"
     maintainer:
         - vnarapar@qti.qualcomm.com
     os:
