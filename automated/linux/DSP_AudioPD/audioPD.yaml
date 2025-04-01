@@ -1,0 +1,22 @@
+metadata:
+        name: cpu-online
+        format: "Lava-Test Test Definition 1.0"
+        description: "Compare arch timer after an interval of 10 seconds"
+        maintainer:
+                - vnarapar@qti.qualcomm.com
+        os:
+                - debian
+                - ubuntu
+                - fedora
+                - centos
+                - oe
+        scope:
+                - functional
+        devices:
+                - rb3gen2
+
+run:
+        steps:
+                - cd ./automated/linux/DSP_AudioPD
+                - ./audioPD.sh
+                - ../../utils/send-to-lava.sh ./output/result.txt
