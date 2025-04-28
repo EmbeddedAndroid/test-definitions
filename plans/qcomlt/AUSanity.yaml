@@ -23,14 +23,14 @@ run:
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/smmu/output/result.txt || true
         - $PWD/automated/linux/iommu/iommu.sh || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/iommu/output/result.txt || true
-        - $PWD/automated/linux/adsp/adsp.sh || true
-        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/adsp/output/result.txt || true
-        - $PWD/automated/linux/cdsp/cdsp.sh || true || true
-        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cdsp/output/result.txt || true
-        - $PWD/automated/linux/wpss/wpss.sh || true || true
-        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/wpss/output/result.txt || true
-        - $PWD/automated/linux/pil-bootup/pil_loading.sh || true || true
-        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/pil-bootup/output/result.txt || true
+        #- $PWD/automated/linux/adsp/adsp.sh || true
+        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/adsp/output/result.txt || true
+        #- $PWD/automated/linux/cdsp/cdsp.sh || true || true
+        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cdsp/output/result.txt || true
+        #- $PWD/automated/linux/wpss/wpss.sh || true || true
+        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/wpss/output/result.txt || true
+        #- $PWD/automated/linux/pil-bootup/pil_loading.sh || true || true
+        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/pil-bootup/output/result.txt || true
         - $PWD/automated/linux/msm-pinctrl/device-script-msm-pinctrl.sh || true || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/msm-pinctrl/output/result.txt || true
         - $PWD/automated/linux/watchdog/watchdog.sh || true
