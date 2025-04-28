@@ -33,3 +33,5 @@ run:
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/pil-bootup/output/result.txt || true
         - $PWD/automated/linux/msm-pinctrl/device-script-msm-pinctrl.sh || true || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/msm-pinctrl/output/result.txt || true
+        - $PWD/automated/linux/watchdog/watchdog.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/watchdog/results.txt || true
