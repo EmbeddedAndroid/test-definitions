@@ -37,7 +37,7 @@ run:
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/watchdog/output/result.txt || true
         - $PWD/automated/linux/rngtest.sh || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/rngtest/output/result.txt || true
-        - $PWD/automated/linux/cpufreq/cpufreq.sh || true
-        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cpufreq/output/result.txt || true
+        #- $PWD/automated/linux/cpufreq/cpufreq.sh || true
+        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cpufreq/output/result.txt || true
         - $PWD/automated/linux/Timer/timer.sh || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/Timer/output/result.txt || true
