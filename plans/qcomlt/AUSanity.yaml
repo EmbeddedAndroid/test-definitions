@@ -37,8 +37,8 @@ run:
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/watchdog/output/result.txt || true
         #- $PWD/automated/linux/rngtest/rngtest.sh || true
         #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/rngtest/output/result.txt || true
-        #- $PWD/automated/linux/KASLR/kaslr.sh || true
-        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/KASLR/output/result.txt || true
+        - $PWD/automated/linux/KASLR/kaslr.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/KASLR/output/result.txt || true
         - $PWD/automated/linux/pinctrl/pinctrl.sh || true
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/pinctrl/output/result.txt || true
         - $PWD/automated/linux/BWMON/bwmon.sh || true

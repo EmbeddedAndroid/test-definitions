@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 . automated/lib/sh-test-lib
 
