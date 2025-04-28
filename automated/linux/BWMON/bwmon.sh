@@ -21,7 +21,7 @@ echo "$initial_votes"
 
 
 echo "Running bw_mem tool..."
-./APT/bw_mem 4000000000 frd &
+./bin/"${abi}"/bw_mem 4000000000 frd &
 
 echo "Vote check while bw_mem tool is running:"
 current_votes=$(extract_votes)
