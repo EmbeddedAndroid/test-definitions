@@ -21,7 +21,8 @@ echo "$initial_votes"
 
 
 echo "Running lat_mem_rd tool..."
-./APT/lat_mem_rd -t 128MB 16
+detect_abi
+./../lmbench/bin//"${abi}"/lat_mem_rd -t 128MB 16
 
 echo "Vote check while bw_mem tool is running:"
 current_votes=$(extract_votes)
