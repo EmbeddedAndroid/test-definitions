@@ -22,7 +22,7 @@ echo "$initial_votes"
 
 echo "Running bw_mem tool..."
 detect_abi
-$PWD/automated/linux/BWMON/bin/"${abi}"/bw_mem 4000000000 frd &
+$PWD/automated/linux/lmbench/bin/"${abi}"/bw_mem 4000000000 frd &
 
 echo "Vote check while bw_mem tool is running:"
 current_votes=$(extract_votes)

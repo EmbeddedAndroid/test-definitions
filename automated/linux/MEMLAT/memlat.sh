@@ -22,7 +22,7 @@ echo "$initial_votes"
 
 echo "Running lat_mem_rd tool..."
 detect_abi
-./bin/"${abi}"/lat_mem_rd -t 128MB 16
+$PWD/automated/linux/lmbench/bin/"${abi}"/lat_mem_rd -t 128MB 16
 
 echo "Vote check while bw_mem tool is running:"
 current_votes=$(extract_votes)
