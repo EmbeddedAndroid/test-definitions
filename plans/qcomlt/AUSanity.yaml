@@ -45,8 +45,8 @@ run:
         - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/pinctrl/output/result.txt || true
         #- $PWD/automated/linux/BWMON/bwmon.sh || true
         #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/BWMON/output/result.txt || true
-        #- $PWD/automated/linux/MEMLAT/memlat.sh || true
-        #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/MEMLAT/output/result.txt || true
+        - $PWD/automated/linux/MEMLAT/memlat.sh || true
+        - $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/MEMLAT/output/result.txt || true
         #- $PWD/automated/linux/cpufreq/cpufreq.sh || true
         #- $PWD/automated/utils/send-to-lava.sh $PWD/automated/linux/cpufreq/output/result.txt || true
         #- $PWD/automated/linux/Timer/timer.sh || true
