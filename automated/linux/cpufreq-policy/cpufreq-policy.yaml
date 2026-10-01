@@ -1,0 +1,36 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: cpufreq-policy
+    description: "For every cpufreq policy with an online CPU, set the
+      lowest and the highest available frequency with the userspace
+      governor and check that the hardware reports it back. Then load every
+      online CPU with stress-ng under the default governor and check that
+      the load completes and each policy scales above its lowest frequency.
+      Platforms without cpufreq, the userspace governor or stress-ng skip
+      the affected cases."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - monaco-arduino-monza
+
+params:
+    # Bring every offline CPU online first (true/false).
+    ONLINE_ALL: "false"
+    # stress-ng load phase length in seconds; 0 skips it.
+    STRESS_SECONDS: "60"
+    # Seconds to wait after a frequency request before reading it back.
+    SETTLE_SECONDS: "1"
+
+run:
+    steps:
+        - cd ./automated/linux/cpufreq-policy/
+        - ./cpufreq-policy.sh -o "${ONLINE_ALL}" -s "${STRESS_SECONDS}" -w "${SETTLE_SECONDS}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
