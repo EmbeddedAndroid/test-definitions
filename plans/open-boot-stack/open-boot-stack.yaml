@@ -1,0 +1,49 @@
+metadata:
+  name: open-boot-stack
+  description: "Bring-up test plan for an open boot stack (TF-A, OP-TEE,
+    U-Boot or another UEFI BL33, Linux) on an Arm64 SoC. The LAVA job adds
+    the console checks the tests cannot do from Linux: a monitor that
+    matches the build fingerprint in the banner of every firmware stage on
+    the cold boot and after a warm reboot, and interactive reboot and
+    poweroff steps. Run the full plan on the default kernel command line,
+    and maxcpus, cpufreq-policy (ONLINE_ALL=true), boot-handoff and
+    kernel-health in one job per maxcpus=N value."
+  os: buildroot
+  devices:
+    - monaco-arduino-monza
+  maintainer:
+    - tyler.baker@oss.qualcomm.com
+  format: Linaro Test Plan v2
+
+tests:
+  automated:
+    - path: automated/linux/boot-fingerprint/boot-fingerprint.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 60
+    - path: automated/linux/boot-handoff/boot-handoff.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 60
+    - path: automated/linux/cpufreq-policy/cpufreq-policy.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 600
+    - path: automated/linux/remoteproc-smoke/remoteproc-smoke.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 120
+    - path: automated/linux/fastrpc/fastrpc.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 300
+    - path: automated/linux/alsa-dsp-restart/alsa-dsp-restart.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 600
+    - path: automated/linux/optee/optee-xtest.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 2400
+    - path: automated/linux/gpu-render/gpu-render.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 300
+    - path: automated/linux/maxcpus/maxcpus.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 300
+    - path: automated/linux/kernel-health/kernel-health.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 60
