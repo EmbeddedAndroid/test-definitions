@@ -12,7 +12,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 |---|---|
 | `boot-fingerprint` | The build fingerprint in `/proc/version`, the rootfs (`/etc/issue`) and, where the firmware publishes it, the SMBIOS BIOS version (U-Boot). |
 | `boot-handoff` | Boot CPU (MPIDR), CPUs online, all CPUs started at EL2, KVM mode and `/dev/kvm`, the OP-TEE driver and `/dev/tee0`, PSCI CPU PM domains in OSI or PC mode. |
-| `cpufreq-policy` | Every policy set to its lowest and highest frequency with the userspace governor and read back, then a stress-ng load on all online CPUs: the load completes and every policy scales up. |
+| `cpufreq-policy` | Every policy set to its lowest and highest frequency with the userspace governor: the frequency read back where the driver reports the running frequency, and a busy loop timed at both frequencies on one CPU of the policy, whose runtime ratio must match the frequency ratio. Then a stress-ng load on all online CPUs: the load completes and every policy scales up. |
 | `maxcpus` | With `maxcpus=N`: N CPUs online at boot, then every other CPU brought online (PSCI CPU_ON of a CPU the firmware has not started). |
 | `memtest` | With `memtest=N` and `CONFIG_MEMTEST`: the kernel's early memory test ran N patterns over all free memory and reported no bad memory. |
 | `remoteproc-smoke` | The DSP remoteprocs are running. |
