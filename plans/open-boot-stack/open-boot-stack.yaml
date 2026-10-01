@@ -7,7 +7,9 @@ metadata:
     the cold boot and after a warm reboot, and interactive reboot and
     poweroff steps. Run the full plan on the default kernel command line,
     and maxcpus, cpufreq-policy (ONLINE_ALL=true), boot-handoff and
-    kernel-health in one job per maxcpus=N value."
+    kernel-health in one job per maxcpus=N value, and memtest,
+    boot-fingerprint, boot-handoff and kernel-health in a job booting with
+    memtest=N."
   os: buildroot
   devices:
     - monaco-arduino-monza
@@ -44,6 +46,9 @@ tests:
     - path: automated/linux/maxcpus/maxcpus.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
+    - path: automated/linux/memtest/memtest.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 60
     - path: automated/linux/kernel-health/kernel-health.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 60

@@ -14,6 +14,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `boot-handoff` | Boot CPU (MPIDR), CPUs online, all CPUs started at EL2, KVM mode and `/dev/kvm`, the OP-TEE driver and `/dev/tee0`, PSCI CPU PM domains in OSI or PC mode. |
 | `cpufreq-policy` | Every policy set to its lowest and highest frequency with the userspace governor and read back, then a stress-ng load on all online CPUs: the load completes and every policy scales up. |
 | `maxcpus` | With `maxcpus=N`: N CPUs online at boot, then every other CPU brought online (PSCI CPU_ON of a CPU the firmware has not started). |
+| `memtest` | With `memtest=N` and `CONFIG_MEMTEST`: the kernel's early memory test ran N patterns over all free memory and reported no bad memory. |
 | `remoteproc-smoke` | The DSP remoteprocs are running. |
 | `fastrpc` | FastRPC round trips to each DSP (signed and unsigned PD) and the FastRPC nodes of DSPs fastrpc_test cannot call. |
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
@@ -59,6 +60,11 @@ whose command line carries `maxcpus=N`: the console monitor,
 `boot-fingerprint`, `boot-handoff` (`CPUS=N`), `maxcpus`, `cpufreq-policy`
 (`ONLINE_ALL=true`) and `kernel-health`.
 
+The memory test is a separate job booting a kernel image whose command
+line carries `memtest=N`: the console monitor, `memtest` first (its lines
+are among the first in the kernel log, which later messages can push
+out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
+
 ## Parameters used on the Arduino VENTUNO Q (QCS8275)
 
 | Definition | Parameters |
@@ -67,6 +73,7 @@ whose command line carries `maxcpus=N`: the console monitor,
 | `remoteproc-smoke` | `DEVICE="adsp cdsp gpdsp0" WAIT_TIME=30` |
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1" NODES="gpdsp0:/dev/fastrpc-gdsp0"` |
 | `alsa-dsp-restart` | `CARD=arduino-monza PCM=MultiMedia1 REMOTEPROC=adsp MIXER="LPI_MI2S_RX_0 Audio Mixer MultiMedia1=on;Headphone Left Switch=on;Headphone Right Switch=on;Headphone Switch=on"` |
+| `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
