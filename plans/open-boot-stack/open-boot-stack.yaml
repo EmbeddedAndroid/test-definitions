@@ -14,7 +14,10 @@ metadata:
     them. inference runs a classifier on each processing unit (CPU,
     NPU) and reports its latency; the job provides the Qualcomm AI
     Runtime SDK zip, the image the model; a negative control with the
-    NPU's remoteproc stopped must fail the NPU cases."
+    NPU's remoteproc stopped must fail the NPU cases. A separate job
+    boots the Arm SystemReady devicetree band ACS image on the same
+    firmware and reports its results with systemready-acs, once per ACS
+    suite."
   os: buildroot
   devices:
     - monaco-arduino-monza
@@ -75,3 +78,6 @@ tests:
     - path: automated/linux/kernel-health/kernel-health.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 60
+    - path: automated/linux/systemready-acs/systemready-acs.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 600
