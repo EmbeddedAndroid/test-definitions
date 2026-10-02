@@ -26,6 +26,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `kvm-unit-tests` | The [KVM unit tests](https://gitlab.com/kvm-unit-tests/kvm-unit-tests) against `/dev/kvm`: small guests that each check part of KVM and its virtual hardware (vectors, SMP, GIC and ITS, timers, PSCI, PMU, debug, FPU context, micro benchmarks). Runs a prebuilt copy in `/opt/kvm-unit-tests` (built for kvmtool on the boards below), one case per test. |
 | `kvm-guest` | A Linux guest under KVM with kvmtool (2 vCPUs, virtio console): it reaches userspace with the vCPUs asked for, runs a command sent over its console and powers off, so that kvmtool exits 0; the time to its ready line is a measurement. |
 | `kernel-health` | Kernel warnings, BUGs, oopses, call traces and panics since boot. |
+| `systemready-acs` | The results of an Arm SystemReady devicetree band ACS run, read from Arm's parsed results on the ACS results partition: one case per SCT test, BSA or PFDI rule, FWTS test, DT check and ACS Linux tool check, and Arm's compliance verdict per suite (see below). |
 
 ## Console checks in the LAVA job
 
@@ -157,3 +158,46 @@ partition, and a login command mounts it and links `/lava-<job id>` into
 `/`. `dmesg -n 1` in the login commands keeps kernel console messages from
 interleaving with the test shell signals; the tests read the complete
 kernel log with `dmesg`.
+
+## SystemReady ACS job
+
+A separate job runs the Arm SystemReady devicetree band ACS
+([arm-systemready](https://github.com/ARM-software/arm-systemready),
+prebuilt `systemready-dt_acs_live_image.wic`) on the same firmware. The
+image has two partitions: `BOOT_ACS`, an ESP with GRUB, the UEFI shell,
+SCT, BSA and PFDI, the ACS Linux kernel and initramfs, and the results
+directory, and `root`, the ACS Linux root filesystem (FWTS, BSA Linux,
+dt-validate, Arm's result parsers). The job flashes the ESP to the board's
+`efi` partition and the root filesystem, grown so LAVA can add its
+overlay, to `rootfs`; the ACS kernel command line names its root by
+PARTUUID, so it is pointed at the board's `rootfs` partition. The
+devicetree is the firmware's: U-Boot's EFI boot manager installs the
+control DT, or `/dtb/<fdtfile>` from the ESP when present.
+
+The ACS then runs unattended across several reboots: SCT (EBBR sequence),
+BSA and PFDI in the UEFI shell, a reset, the ACS Linux (FWTS, BSA, the DT
+checks, block devices, ethtool, PSCI, SMBIOS, the systemready-scripts
+checks), a reboot for the capsule update step, and the ACS Linux again,
+which parses every log with Arm's log parser into
+`acs_results/acs_summary` and prints `ACS automated test suites run is
+completed.`. The job:
+
+- checks the firmware fingerprints on the cold boot (monitor up to `UEFI
+  Interactive Shell`) and on every later boot (one monitor until `Please
+  wait acs results are syncing on storage medium`, whose pattern also
+  matches a banner carrying another fingerprint of the same scheme and
+  maps it to `fail`); the ACS resets the board many times (SCT watchdog
+  and reset tests, SCT, BSA, PFDI, the capsule step), 17 times on the
+  boards below;
+- logs in to the ACS Linux: root is logged in on the console already, so
+  a `minimal` boot with `kernel-start-message: ""` waits for the
+  completion line, printed 60 s after the monitor's end, and sends `root`
+  to get a fresh prompt;
+- runs `systemready-acs` once per suite: `acs` (Arm's compliance verdict
+  per ACS suite and overall, the fingerprint in the SMBIOS BIOS version,
+  and, with `DUMP=true`, the results as a base64 tarball in the log),
+  `sct`, `bsa`, `fwts`, `dt`, `standalone`, `pfdi`, `post-script`; each
+  case is Arm's result for one test (an SCT test, a BSA rule, an FWTS
+  test, a DT check), grouped in test sets by the ACS sub suite, with
+  Arm's reasons attached to the failing ones;
+- powers the board off.
