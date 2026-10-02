@@ -1,0 +1,45 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: video-codec
+    description: "V4L2 stateful video codec check through FFmpeg's v4l2m2m
+      wrappers: hardware decodes of reference streams must match the software
+      decode frame by frame (MD5), a hardware encode must decode to the right
+      frame count and quality. With the platform device and driver given,
+      decodes after runtime suspend and after a driver rebind, and the
+      negative case: without its firmware file the driver must not probe,
+      or must not decode if it loads the firmware on the first open.
+      Without a codec video node or FFmpeg the test is skipped."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - qrb2210-arduino-imola
+
+params:
+    # Codec platform device and its driver, e.g. 5a00000.video-codec and
+    # qcom-venus; empty skips the runtime PM, rebind and firmware cases.
+    DEVICE: ""
+    DRIVER: ""
+    # FFmpeg codec names with a <codec>_v4l2m2m wrapper.
+    DECODERS: "h264 hevc vp9"
+    ENCODERS: "h264"
+    # Reference streams <codec>-*.<ext> with <stream>.md5 next to each.
+    STREAMS: "/usr/share/video-codec"
+    # Firmware file hidden for the negative case; empty skips it.
+    FIRMWARE: ""
+    MIN_PSNR: "30"
+    # Encoded frame size; a size the codec does not pad (see the script).
+    ENCODE_SIZE: "1280x736"
+
+run:
+    steps:
+        - cd ./automated/linux/video-codec/
+        - ./video-codec.sh -d "${DEVICE}" -r "${DRIVER}" -D "${DECODERS}" -E "${ENCODERS}" -s "${STREAMS}" -f "${FIRMWARE}" -p "${MIN_PSNR}" -S "${ENCODE_SIZE}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
