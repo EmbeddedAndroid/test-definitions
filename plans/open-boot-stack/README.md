@@ -20,6 +20,8 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
 | `optee-xtest` | The OP-TEE regression suite. |
 | `gpu-render` | A DRM render node and a headless render with pixel readback (`egl-readback`). |
+| `kvm-unit-tests` | The [KVM unit tests](https://gitlab.com/kvm-unit-tests/kvm-unit-tests) against `/dev/kvm`: small guests that each check part of KVM and its virtual hardware (vectors, SMP, GIC and ITS, timers, PSCI, PMU, debug, FPU context, micro benchmarks). Runs a prebuilt copy in `/opt/kvm-unit-tests` (built for kvmtool on the boards below), one case per test. |
+| `kvm-guest` | A Linux guest under KVM with kvmtool (2 vCPUs, virtio console): it reaches userspace with the vCPUs asked for, runs a command sent over its console and powers off, so that kvmtool exits 0; the time to its ready line is a measurement. |
 | `kernel-health` | Kernel warnings, BUGs, oopses, call traces and panics since boot. |
 
 ## Console checks in the LAVA job
@@ -65,6 +67,21 @@ line carries `memtest=N`: the console monitor, `memtest` first (its lines
 are among the first in the kernel log, which later messages can push
 out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
 
+The KVM tests run in the full job, after `gpu-render` and before
+`kernel-health`, so a KVM warning shows up there too.
+
+The negative control is the `maxcpus=2` job on an image booted with
+`maxcpus=2 kvm-arm.mode=none`, expecting a wrong fingerprint, a wrong
+`maxcpus` value and KVM: every console stage, `boot-fingerprint`,
+`maxcpus-cmdline`, `maxcpus-online-at-boot`, `kvm-initialized`,
+`kvm-device` (`boot-handoff` and `kvm-unit-tests` with
+`REQUIRE_KVM=true`) and all `kvm-guest` cases must fail, and no KVM unit
+test may pass (the runner skips them all without `/dev/kvm`).
+
+`kvm-guest` needs `socat` besides kvmtool: kvmtool reads console input only
+from a terminal, so the test runs it on a pty that `socat` connects to the
+test.
+
 ## Parameters used on the Arduino VENTUNO Q (QCS8275)
 
 | Definition | Parameters |
@@ -74,6 +91,8 @@ out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1" NODES="gpdsp0:/dev/fastrpc-gdsp0"` |
 | `alsa-dsp-restart` | `CARD=arduino-monza PCM=MultiMedia1 REMOTEPROC=adsp MIXER="LPI_MI2S_RX_0 Audio Mixer MultiMedia1=on;Headphone Left Switch=on;Headphone Right Switch=on;Headphone Switch=on"` |
 | `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
+| `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
+| `kvm-guest` | `VCPUS=2 MEMORY=256` |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`

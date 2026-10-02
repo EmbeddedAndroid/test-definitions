@@ -9,10 +9,13 @@ metadata:
     and maxcpus, cpufreq-policy (ONLINE_ALL=true), boot-handoff and
     kernel-health in one job per maxcpus=N value, and memtest,
     boot-fingerprint, boot-handoff and kernel-health in a job booting with
-    memtest=N."
+    memtest=N. The KVM tests (kvm-unit-tests, kvm-guest) run in the full
+    plan; a negative control booting with kvm-arm.mode=none must fail
+    them."
   os: buildroot
   devices:
     - monaco-arduino-monza
+    - qrb2210-arduino-imola
   maintainer:
     - tyler.baker@oss.qualcomm.com
   format: Linaro Test Plan v2
@@ -44,6 +47,12 @@ tests:
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
     - path: automated/linux/maxcpus/maxcpus.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 300
+    - path: automated/linux/kvm-unit-tests/kvm-unit-tests.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 900
+    - path: automated/linux/kvm-guest/kvm-guest.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
     - path: automated/linux/memtest/memtest.yaml
