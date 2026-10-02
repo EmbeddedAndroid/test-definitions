@@ -18,6 +18,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `remoteproc-smoke` | The DSP remoteprocs are running. |
 | `fastrpc` | FastRPC round trips to each DSP (signed and unsigned PD) and the FastRPC nodes of DSPs fastrpc_test cannot call. |
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
+| `remoteproc-restart` | Each remoteproc stopped and started through sysfs, three times: offline after the stop, running after the start, its rpmsg channels back with the same drivers, no remoteproc crash, warning or oops in the kernel log. Remoteprocs known not to survive a restart are listed with a reason and reported as skip. |
 | `optee-xtest` | The OP-TEE regression suite. |
 | `gpu-render` | A DRM render node and a headless render with pixel readback (`egl-readback`). |
 | `video-codec` | V4L2 stateful codec through FFmpeg's v4l2m2m wrappers: hardware decodes of H.264, HEVC and VP9 reference streams match the software decode frame by frame (MD5), a hardware encode decodes to the right frame count with a minimum PSNR; decodes after runtime suspend and after a driver rebind; without its firmware file the driver must not probe, or must not decode if it loads the firmware on the first open. Needs FFmpeg 7.0 or later and the streams in `/usr/share/video-codec` (qcom-buildroot `qcom/video`). |
@@ -71,6 +72,10 @@ out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
 The KVM tests run in the full job, after `gpu-render` and before
 `kernel-health`, so a KVM warning shows up there too.
 
+`remoteproc-restart` runs in the full job after the DSP and audio tests,
+so that they see the remoteprocs as booted, and before `kernel-health`,
+which counts any warning a restart leaves behind.
+
 The negative control is the `maxcpus=2` job on an image booted with
 `maxcpus=2 kvm-arm.mode=none`, expecting a wrong fingerprint, a wrong
 `maxcpus` value and KVM: every console stage, `boot-fingerprint`,
@@ -91,6 +96,7 @@ test.
 | `remoteproc-smoke` | `DEVICE="adsp cdsp gpdsp0" WAIT_TIME=30` |
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1" NODES="gpdsp0:/dev/fastrpc-gdsp0"` |
 | `alsa-dsp-restart` | `CARD=arduino-monza PCM=MultiMedia1 REMOTEPROC=adsp MIXER="LPI_MI2S_RX_0 Audio Mixer MultiMedia1=on;Headphone Left Switch=on;Headphone Right Switch=on;Headphone Switch=on"` |
+| `remoteproc-restart` | `REMOTEPROCS="adsp cdsp gpdsp0"` |
 | `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
 | `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
 | `kvm-guest` | `VCPUS=2 MEMORY=256` |
@@ -100,6 +106,7 @@ test.
 | Definition | Parameters |
 |---|---|
 | `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
+| `remoteproc-restart` | `REMOTEPROCS=adsp EXPECTED_FAIL="adsp=the Linux audio drivers do not survive an ADSP stop"`: SoundWire reads the LPASS core the PAS shutdown has reset (synchronous external abort) and the audio clocks are then disabled twice |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`

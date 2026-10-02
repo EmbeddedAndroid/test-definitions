@@ -40,6 +40,9 @@ tests:
     - path: automated/linux/alsa-dsp-restart/alsa-dsp-restart.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 600
+    - path: automated/linux/remoteproc-restart/remoteproc-restart.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 900
     - path: automated/linux/optee/optee-xtest.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 2400
