@@ -1,0 +1,48 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: remoteproc-restart
+    description: "Stop and start each remoteproc through sysfs, ITERATIONS
+      times: the state must read offline after the stop and running after
+      the start, the rpmsg channels (glink or smd) the remoteproc had
+      before the first stop must come back bound to the same drivers, and
+      the kernel must log no remoteproc crash, warning or oops meanwhile.
+      One case per remoteproc, step and iteration. Remoteprocs listed in
+      EXPECTED_FAIL are reported as skip with their reason; a remoteproc
+      named in REMOTEPROCS or EXPECTED_FAIL that does not exist fails."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - monaco-arduino-monza
+        - qrb2210-arduino-imola
+        - lemans-evk
+        - qcs6490-rb3gen2
+
+params:
+    # Remoteprocs to restart, by name; empty restarts every remoteproc
+    # present except those in SKIP.
+    REMOTEPROCS: ""
+    # Remoteprocs never stopped: another subsystem owns their lifecycle,
+    # e.g. ath11k for wpss.
+    SKIP: "modem wpss"
+    # Remoteprocs known not to survive a restart, <name>=<reason> separated
+    # by ';': reported as skip with the reason, not restarted.
+    EXPECTED_FAIL: ""
+    ITERATIONS: "3"
+    # Time allowed for each state change and for the channels to come back.
+    WAIT_SECONDS: "30"
+    # Time the remoteproc must stay up after its channels are back.
+    SETTLE_SECONDS: "5"
+
+run:
+    steps:
+        - cd ./automated/linux/remoteproc-restart/
+        - ./remoteproc-restart.sh -d "${REMOTEPROCS}" -s "${SKIP}" -x "${EXPECTED_FAIL}" -n "${ITERATIONS}" -w "${WAIT_SECONDS}" -t "${SETTLE_SECONDS}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
