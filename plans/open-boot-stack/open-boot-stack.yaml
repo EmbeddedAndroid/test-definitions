@@ -46,6 +46,9 @@ tests:
     - path: automated/linux/gpu-render/gpu-render.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
+    - path: automated/linux/video-codec/video-codec.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 600
     - path: automated/linux/maxcpus/maxcpus.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300

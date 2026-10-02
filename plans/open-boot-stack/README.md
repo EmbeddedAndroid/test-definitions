@@ -20,6 +20,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
 | `optee-xtest` | The OP-TEE regression suite. |
 | `gpu-render` | A DRM render node and a headless render with pixel readback (`egl-readback`). |
+| `video-codec` | V4L2 stateful codec through FFmpeg's v4l2m2m wrappers: hardware decodes of H.264, HEVC and VP9 reference streams match the software decode frame by frame (MD5), a hardware encode decodes to the right frame count with a minimum PSNR; decodes after runtime suspend and after a driver rebind; without its firmware file the driver must not probe, or must not decode if it loads the firmware on the first open. Needs FFmpeg 7.0 or later and the streams in `/usr/share/video-codec` (qcom-buildroot `qcom/video`). |
 | `kvm-unit-tests` | The [KVM unit tests](https://gitlab.com/kvm-unit-tests/kvm-unit-tests) against `/dev/kvm`: small guests that each check part of KVM and its virtual hardware (vectors, SMP, GIC and ITS, timers, PSCI, PMU, debug, FPU context, micro benchmarks). Runs a prebuilt copy in `/opt/kvm-unit-tests` (built for kvmtool on the boards below), one case per test. |
 | `kvm-guest` | A Linux guest under KVM with kvmtool (2 vCPUs, virtio console): it reaches userspace with the vCPUs asked for, runs a command sent over its console and powers off, so that kvmtool exits 0; the time to its ready line is a measurement. |
 | `kernel-health` | Kernel warnings, BUGs, oopses, call traces and panics since boot. |
@@ -93,6 +94,12 @@ test.
 | `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
 | `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
 | `kvm-guest` | `VCPUS=2 MEMORY=256` |
+
+## Parameters used on the Arduino UNO Q (QRB2210)
+
+| Definition | Parameters |
+|---|---|
+| `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
