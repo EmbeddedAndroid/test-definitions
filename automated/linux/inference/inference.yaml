@@ -1,0 +1,56 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: inference
+    description: "Image classification (MobileNetV2, seven images) on each
+      processing unit the board has, with one model and one set of inputs:
+      every image's top-1 checked against its expected class, latency per
+      inference (mean, p50, p90 after warm-up) as measurements, each
+      accelerator against the CPU running the same runtime and the HTP
+      against the QAIRT x86 simulation, and a comparison table of all units.
+      Today: the Qualcomm AI Runtime (QAIRT) QNN CPU and HTP (NPU, over
+      FastRPC) backends. The QAIRT SDK zip as Qualcomm publishes it is an
+      input of the job and the model comes with the image; units the board
+      does not have, or cannot run without an input, are skipped."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - buildroot
+        - openembedded
+        - debian
+        - ubuntu
+    scope:
+        - functional
+        - performance
+    devices:
+        - monaco-arduino-monza
+        - qcs6490-rb3gen2
+        - lemans-evk
+        - qrb2210-arduino-imola
+
+params:
+    # What the board has, space separated: cpu:qnn, and per Hexagon NSP
+    # npu<N>:qnn-htp:<Hexagon arch>:<QNN HTP device id>:<remoteproc>
+    PUS: "cpu:qnn"
+    # Units the board does not have, "<pu>=<reason>;...": reported as skip.
+    ABSENT: ""
+    # The QAIRT SDK zip on the board, its SHA-256 and the directory its
+    # files sit under.
+    QAIRT_ZIP: ""
+    QAIRT_SHA256: ""
+    QAIRT_ROOT: "qairt/2.42.0.251225"
+    # The model: DLCs, inputs, expected classes, x86 references,
+    # MANIFEST.sha256 (qcom-buildroot images carry it).
+    MODEL_DIR: "/usr/share/inference/mobilenet_v2"
+    MIN_COSINE: "0.98"
+    MAX_HOST_DIFF: "0.5"
+    WARMUP: "5"
+    RUNS: "50"
+    # "", htp-down (the NSP cases must fail) or wrong-class (every top-1
+    # case must fail)
+    NEGATIVE: ""
+
+run:
+    steps:
+        - cd ./automated/linux/inference/
+        - ./inference.sh -p "${PUS}" -a "${ABSENT}" -z "${QAIRT_ZIP}" -s "${QAIRT_SHA256}" -r "${QAIRT_ROOT}" -m "${MODEL_DIR}" -c "${MIN_COSINE}" -x "${MAX_HOST_DIFF}" -w "${WARMUP}" -l "${RUNS}" -n "${NEGATIVE}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
