@@ -11,11 +11,16 @@ metadata:
     boot-fingerprint, boot-handoff and kernel-health in a job booting with
     memtest=N. The KVM tests (kvm-unit-tests, kvm-guest) run in the full
     plan; a negative control booting with kvm-arm.mode=none must fail
-    them."
+    them. inference runs a classifier on each processing unit (CPU,
+    NPU) and reports its latency; the job provides the Qualcomm AI
+    Runtime SDK zip, the image the model; a negative control with the
+    NPU's remoteproc stopped must fail the NPU cases."
   os: buildroot
   devices:
     - monaco-arduino-monza
     - qrb2210-arduino-imola
+    - qcs6490-rb3gen2
+    - lemans-evk
   maintainer:
     - tyler.baker@oss.qualcomm.com
   format: Linaro Test Plan v2
@@ -37,6 +42,9 @@ tests:
     - path: automated/linux/fastrpc/fastrpc.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
+    - path: automated/linux/inference/inference.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 900
     - path: automated/linux/alsa-dsp-restart/alsa-dsp-restart.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 600

@@ -17,6 +17,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `memtest` | With `memtest=N` and `CONFIG_MEMTEST`: the kernel's early memory test ran N patterns over all free memory and reported no bad memory. |
 | `remoteproc-smoke` | The DSP remoteprocs are running. |
 | `fastrpc` | FastRPC round trips to each DSP (signed and unsigned PD) and the FastRPC nodes of DSPs fastrpc_test cannot call. |
+| `inference` | Image classification (MobileNetV2, seven images) on every processing unit (PU) of the board with the same model and inputs: on each PU every image's top-1 is its expected class, and the latency per inference (mean, p50, p90 over the timed runs after warm-up) is reported as measurements in ms. Each NPU (one per Hexagon NSP, QNN HTP backend over FastRPC) also agrees with the QNN CPU backend (same top-1, logit cosine at least `MIN_COSINE`) and with the SDK's x86 HTP simulation (within `MAX_HOST_DIFF`), and is faster than it. A PU the board does not have is one `skip` case with the reason. The log ends with a table comparing the PUs. |
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
 | `remoteproc-restart` | Each remoteproc stopped and started through sysfs, three times: offline after the stop, running after the start, its rpmsg channels back with the same drivers, no remoteproc crash, warning or oops in the kernel log. Remoteprocs known not to survive a restart are listed with a reason and reported as skip. |
 | `optee-xtest` | The OP-TEE regression suite. |
@@ -84,6 +85,32 @@ The negative control is the `maxcpus=2` job on an image booted with
 `REQUIRE_KVM=true`) and all `kvm-guest` cases must fail, and no KVM unit
 test may pass (the runner skips them all without `/dev/kvm`).
 
+`inference` runs after `fastrpc` in the full job. `PUS` names what the
+board has, one entry per PU and runtime (`cpu:qnn`, and
+`npu<N>:qnn-htp:<Hexagon arch>:<QNN device id>:<remoteproc>` per NSP);
+`ABSENT` names what it does not have, with the reason. The Qualcomm AI
+Runtime (QAIRT) is not in the image, since its license does not allow
+redistributing the SDK on its own: the job writes the SDK zip to the
+overlay partition as a `file` overlay, which the LAVA dispatcher downloads
+from Qualcomm's public URL for each job (it is never uploaded anywhere).
+The test checks the zip's SHA-256 and extracts only the files it runs
+(`qnn-net-run`, `qnn-profile-viewer`, the CPU and HTP backends, the HTP
+stub of the board's architecture and its Hexagon skel). The model comes
+with the image (qcom-buildroot builds it from pinned public inputs) and
+holds open content only: MobileNetV2 from the ONNX model zoo (Apache-2.0)
+as two DLCs (fp32 for the CPU backend, 8-bit with per-channel weights for
+the HTP), seven public domain or CC0 images preprocessed to the model
+input, the expected classes, and the x86 outputs of both backends. The
+FastRPC userspace and the DSP runtime come with the image too. Latency
+comes from `qnn-net-run`'s basic profile (one EXECUTE time per
+inference); performance has no pass threshold beyond the NPU being faster
+than the CPU, so builds are compared by differencing the measurements of
+two runs. The negative control job also runs `inference` with
+`NEGATIVE=htp-down` (the NSP remoteprocs stopped: every NPU case must
+fail, the CPU cases pass) and with `NEGATIVE=wrong-class` (the expected
+classes rotated: every top-1 case must fail). Without the zip or the
+model, the cases of the PUs that need them are skipped.
+
 `kvm-guest` needs `socat` besides kvmtool: kvmtool reads console input only
 from a terminal, so the test runs it on a pty that `socat` connects to the
 test.
@@ -100,6 +127,14 @@ test.
 | `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
 | `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
 | `kvm-guest` | `VCPUS=2 MEMORY=256` |
+| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v75:0:cdsp"` |
+
+## Parameters used on the RB3 Gen 2 (QCS6490) and the IQ-9075 EVK (Lemans)
+
+| Definition | RB3 Gen 2 | IQ-9075 EVK |
+|---|---|---|
+| `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1"` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1 cdsp1:cdsp1:4:0 cdsp1-unsigned-pd:cdsp1:4:1" NODES="gpdsp0:/dev/fastrpc-gdsp0 gpdsp1:/dev/fastrpc-gdsp1"` |
+| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1"` (both NSPs) |
 
 ## Parameters used on the Arduino UNO Q (QRB2210)
 
@@ -107,6 +142,7 @@ test.
 |---|---|
 | `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
 | `remoteproc-restart` | `REMOTEPROCS=adsp EXPECTED_FAIL="adsp=the Linux audio drivers do not survive an ADSP stop"`: SoundWire reads the LPASS core the PAS shutdown has reset (synchronous external abort) and the audio clocks are then disabled twice |
+| `inference` | `PUS="" ABSENT="npu=QRB2210 has no Hexagon NSP"` |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
