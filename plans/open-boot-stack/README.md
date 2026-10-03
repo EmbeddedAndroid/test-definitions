@@ -86,9 +86,14 @@ The negative control is the `maxcpus=2` job on an image booted with
 test may pass (the runner skips them all without `/dev/kvm`).
 
 `inference` runs after `fastrpc` in the full job. `PUS` names what the
-board has, one entry per PU and runtime (`cpu:qnn`, and
-`npu<N>:qnn-htp:<Hexagon arch>:<QNN device id>:<remoteproc>` per NSP);
-`ABSENT` names what it does not have, with the reason. The Qualcomm AI
+board has, one entry per PU and runtime (`cpu:qnn`,
+`npu<N>:qnn-htp:<Hexagon arch>:<QNN device id>:<remoteproc>` per NSP,
+`cpu:tflite` and `gpu:tflite-gpu`); `ABSENT` names what it does not have,
+with the reason. The TensorFlow Lite entries run the image's `tflite-run`
+on a TensorFlow Lite build of the same model: XNNPACK on the CPU, checked
+against the x86 LiteRT outputs, and the GPU delegate (OpenCL, fp16),
+checked against the CPU run as the NPU is against the QNN CPU backend, as
+the stock VENTUNO Q and UNO Q images run models on the GPU. The Qualcomm AI
 Runtime (QAIRT) is not in the image, since its license does not allow
 redistributing the SDK on its own: the job writes the SDK zip to the
 overlay partition as a `file` overlay, which the LAVA dispatcher downloads
@@ -107,9 +112,11 @@ inference); performance has no pass threshold beyond the NPU being faster
 than the CPU, so builds are compared by differencing the measurements of
 two runs. The negative control job also runs `inference` with
 `NEGATIVE=htp-down` (the NSP remoteprocs stopped: every NPU case must
-fail, the CPU cases pass) and with `NEGATIVE=wrong-class` (the expected
-classes rotated: every top-1 case must fail). Without the zip or the
-model, the cases of the PUs that need them are skipped.
+fail, the CPU cases pass), on boards with a GPU entry with
+`NEGATIVE=gpu-down` (no OpenCL platform visible: every GPU case must fail)
+and with `NEGATIVE=wrong-class` (the expected classes rotated: every top-1
+case must fail). Without the zip, the model or `tflite-run`, the cases of
+the PUs that need them are skipped.
 
 `kvm-guest` needs `socat` besides kvmtool: kvmtool reads console input only
 from a terminal, so the test runs it on a pty that `socat` connects to the
@@ -127,14 +134,14 @@ test.
 | `memtest` | none; the image boots with `memtest=4`: patterns 0xaaaaaaaaaaaaaaaa, 0x5555555555555555, all ones, all zeros |
 | `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
 | `kvm-guest` | `VCPUS=2 MEMORY=256` |
-| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v75:0:cdsp"` |
+| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v75:0:cdsp cpu:tflite gpu:tflite-gpu"` |
 
 ## Parameters used on the RB3 Gen 2 (QCS6490) and the IQ-9075 EVK (Lemans)
 
 | Definition | RB3 Gen 2 | IQ-9075 EVK |
 |---|---|---|
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1"` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1 cdsp1:cdsp1:4:0 cdsp1-unsigned-pd:cdsp1:4:1" NODES="gpdsp0:/dev/fastrpc-gdsp0 gpdsp1:/dev/fastrpc-gdsp1"` |
-| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1"` (both NSPs) |
+| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp" ABSENT="gpu=no GPU support in the image"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1"` (both NSPs) `ABSENT="gpu=no GPU support in the image"` |
 
 ## Parameters used on the Arduino UNO Q (QRB2210)
 
@@ -142,7 +149,7 @@ test.
 |---|---|
 | `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
 | `remoteproc-restart` | `REMOTEPROCS=adsp EXPECTED_FAIL="adsp=the Linux audio drivers do not survive an ADSP stop"`: SoundWire reads the LPASS core the PAS shutdown has reset (synchronous external abort) and the audio clocks are then disabled twice |
-| `inference` | `PUS="" ABSENT="npu=QRB2210 has no Hexagon NSP"` |
+| `inference` | `PUS="cpu:tflite gpu:tflite-gpu" ABSENT="npu=QRB2210 has no Hexagon NSP"` |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
