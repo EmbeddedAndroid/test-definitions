@@ -141,7 +141,7 @@ test.
 | Definition | RB3 Gen 2 | IQ-9075 EVK |
 |---|---|---|
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1"` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1 cdsp1:cdsp1:4:0 cdsp1-unsigned-pd:cdsp1:4:1" NODES="gpdsp0:/dev/fastrpc-gdsp0 gpdsp1:/dev/fastrpc-gdsp1"` |
-| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp" ABSENT="gpu=no GPU support in the image"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1"` (both NSPs) `ABSENT="gpu=no GPU support in the image"` |
+| `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp cpu:tflite gpu:tflite-gpu"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1 cpu:tflite gpu:tflite-gpu"` (both NSPs) |
 
 ## Parameters used on the Arduino UNO Q (QRB2210)
 

@@ -18,6 +18,9 @@ metadata:
         - functional
     devices:
         - monaco-arduino-monza
+        - qcs6490-rb3gen2
+        - lemans-evk
+        - qrb2210-arduino-imola
 
 params:
     # Kernel driver the render node's device must be bound to, e.g. msm_dpu;
