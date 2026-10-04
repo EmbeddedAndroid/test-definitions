@@ -150,7 +150,7 @@ test.
 |---|---|
 | `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
 | `remoteproc-restart` | `REMOTEPROCS=adsp EXPECTED_FAIL="adsp=the Linux audio drivers do not survive an ADSP stop"`: SoundWire reads the LPASS core the PAS shutdown has reset (synchronous external abort) and the audio clocks are then disabled twice |
-| `inference` | `PUS="cpu:tflite gpu:tflite-gpu" ABSENT="npu=QRB2210 has no Hexagon NSP"` |
+| `inference` | `PUS="cpu:tflite gpu:tflite-gpu" ABSENT="npu=QRB2210 has no Hexagon NSP;cpu-qnn=QAIRT 2.42 does not support QRB2210 (soc_id 524)"`: the QAIRT 2.42 CPU backend refuses the SoC (`Could not initialize backend`), while the same binary and model run on the same Cortex-A53 cores when `/sys/devices/soc0/soc_id` reads 675 or 497, so the QNN CPU entry is reported absent until QAIRT supports the QRB2210 |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
