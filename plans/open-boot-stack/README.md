@@ -108,8 +108,12 @@ as two DLCs (fp32 for the CPU backend, 8-bit with per-channel weights for
 the HTP), seven public domain or CC0 images preprocessed to the model
 input, the expected classes, and the x86 outputs of both backends. The
 FastRPC userspace and the DSP runtime come with the image too. Latency
-comes from `qnn-net-run`'s basic profile (one EXECUTE time per
-inference); performance has no pass threshold beyond the NPU being faster
+comes from `qnn-net-run`'s basic profile (one NETRUN EXECUTE time per
+inference). HTP runs use `--synchronous`, so the NPU numbers are
+per-inference latency rather than including the wait behind inferences
+`qnn-net-run` queued ahead. Host tests for the script:
+`docker compose -f test/compose.inference.yaml run --build --rm inference`.
+Performance has no pass threshold beyond the NPU being faster
 than the CPU, so builds are compared by differencing the measurements of
 two runs. The negative control job also runs `inference` with
 `NEGATIVE=htp-down` (the NSP remoteprocs stopped: every NPU case must

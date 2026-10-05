@@ -1,0 +1,7 @@
+services:
+  inference:
+    build:
+      context: ..
+      dockerfile: test/Dockerfile.inference
+    volumes:
+      - ..:/work:ro

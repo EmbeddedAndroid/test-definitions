@@ -202,6 +202,8 @@ qnn_run() {
     set -- --backend "${QLIB}/${backend}" --model "${QLIB}/libQnnModelDlc.so" \
         --dlc_path "${dlc}" --input_list "${list}" --output_dir "${out}" \
         --profiling_level basic
+    # Async HTP NETRUN times include the wait behind queued inferences.
+    [ "${backend}" = libQnnHtp.so ] && set -- "$@" --synchronous
     [ -n "${cfg}" ] && set -- "$@" --config_file "${cfg}"
     info_msg "qnn-net-run $*"
     "${QBIN}/qnn-net-run" "$@" > "${out}.log" 2>&1
@@ -528,7 +530,7 @@ EOF
         else
             report_fail "${t}-speedup"
         fi
-        table "${pu}" qnn-htp "${TOP1}" "${lat}" "QNN HTP ${dev} (${rp}), 8-bit"
+        table "${pu}" qnn-htp "${TOP1}" "${lat}" "QNN HTP ${dev} (${rp}), 8-bit, synchronous"
         if [ "${stopped}" -eq 1 ]; then
             info_msg "negative control: starting ${rp} again"
             echo start > "${rpath}/state"
