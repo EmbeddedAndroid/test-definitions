@@ -18,7 +18,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `remoteproc-smoke` | The DSP remoteprocs are running and none has crashed since boot (a remoteproc that crashed and was recovered is running again). |
 | `fastrpc` | FastRPC round trips to each DSP (signed and unsigned PD) and the FastRPC nodes of DSPs fastrpc_test cannot call. |
 | `inference` | Image classification (MobileNetV2, seven images) on every processing unit (PU) of the board with the same model and inputs: on each PU every image's top-1 is its expected class, and the latency per inference (mean, p50, p90 over the timed runs after warm-up) is reported as measurements in ms. Each NPU (one per Hexagon NSP, QNN HTP backend over FastRPC) also agrees with the QNN CPU backend (same top-1, logit cosine at least `MIN_COSINE`) and with the SDK's x86 HTP simulation (within `MAX_HOST_DIFF`), and is faster than it. A PU the board does not have is one `skip` case with the reason. The log ends with a table comparing the PUs. |
-| `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
+| `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. With `CAPTURE_PCM`, a recording after each playback that must deliver all its frames and not be all zeros. |
 | `remoteproc-restart` | Each remoteproc stopped and started through sysfs, three times: offline after the stop, running after the start, its rpmsg channels back with the same drivers, no remoteproc crash, warning or oops in the kernel log. Remoteprocs known not to survive a restart are listed with a reason and reported as skip. |
 | `optee-xtest` | The OP-TEE regression suite. |
 | `gpu-render` | A DRM render node and a headless render with pixel readback (`egl-readback`). |
@@ -143,6 +143,7 @@ test.
 |---|---|---|
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1"` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1 cdsp1:cdsp1:4:0 cdsp1-unsigned-pd:cdsp1:4:1" NODES="gpdsp0:/dev/fastrpc-gdsp0 gpdsp1:/dev/fastrpc-gdsp1"` |
 | `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp cpu:tflite gpu:tflite-gpu"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1 cpu:tflite gpu:tflite-gpu"` (both NSPs) |
+| `alsa-dsp-restart` | not run (no audio userspace in the image) | `CARD=LEMANSEVK PCM=MultiMedia1 MIXER="PRIMARY_MI2S_RX Audio Mixer MultiMedia1=1" CAPTURE_PCM=MultiMedia2 CAPTURE_MIXER="MultiMedia2 Mixer TERTIARY_MI2S_TX=1" REMOTEPROC=adsp`: the MAX98357A amplifier and the DMIC of the EVK, routed as alsa-ucm-conf `Qualcomm/sa8775p/lemans-evk` does (the card is named because `snd-aloop` is card 0); the image needs alsa-utils and `qcom/sa8775p/LEMANS-EVK-tplg.bin`. Playback has no loopback, so it shows the DSP accepts and drains the stream, not that sound comes out. |
 
 ## Parameters used on the Arduino UNO Q (QRB2210)
 

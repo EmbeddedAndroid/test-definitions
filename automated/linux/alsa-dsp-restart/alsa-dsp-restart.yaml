@@ -9,7 +9,8 @@ metadata:
       back and plays. The mixer settings that route the PCM to an output
       are a parameter and are applied before every playback. Without the
       card the test is skipped; without the remoteproc or debugfs only the
-      restart cases are."
+      restart cases are. With a capture PCM every playback is followed by a
+      recording that must deliver all its frames and not be all zeros."
     maintainer:
         - tyler.baker@oss.qualcomm.com
     os:
@@ -22,6 +23,7 @@ metadata:
         - functional
     devices:
         - monaco-arduino-monza
+        - lemans-evk
 
 params:
     # ALSA card id or name from /proc/asound/cards; empty is the first card.
@@ -40,9 +42,15 @@ params:
     FORMAT: "S16_LE"
     RATE: "48000"
     CHANNELS: "2"
+    # Name of the capture PCM as arecord -l lists it; empty skips capture.
+    CAPTURE_PCM: ""
+    # Mixer settings for capture, as MIXER.
+    CAPTURE_MIXER: ""
+    CAPTURE_CHANNELS: "1"
+    CAPTURE_RATE: "48000"
 
 run:
     steps:
         - cd ./automated/linux/alsa-dsp-restart/
-        - ./alsa-dsp-restart.sh -c "${CARD}" -p "${PCM}" -m "${MIXER}" -r "${REMOTEPROC}" -d "${PLAY_SECONDS}" -b "${BUSY_SECONDS}" -w "${WAIT_SECONDS}" -f "${FORMAT}" -R "${RATE}" -C "${CHANNELS}"
+        - ./alsa-dsp-restart.sh -c "${CARD}" -p "${PCM}" -m "${MIXER}" -r "${REMOTEPROC}" -d "${PLAY_SECONDS}" -b "${BUSY_SECONDS}" -w "${WAIT_SECONDS}" -f "${FORMAT}" -R "${RATE}" -C "${CHANNELS}" -P "${CAPTURE_PCM}" -M "${CAPTURE_MIXER}" -N "${CAPTURE_CHANNELS}" -S "${CAPTURE_RATE}"
         - ../../utils/send-to-lava.sh ./output/result.txt
