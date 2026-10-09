@@ -7,9 +7,9 @@ metadata:
       inference (mean, p50, p90 after warm-up) as measurements, each
       accelerator against the CPU running the same runtime and the HTP
       against the QAIRT x86 simulation, and a comparison table of all units.
-      Runtimes: the Qualcomm AI Runtime (QAIRT) QNN CPU and HTP (NPU, over
-      FastRPC) backends, and TensorFlow Lite with XNNPACK (CPU) and its GPU
-      delegate (OpenCL). The QAIRT SDK zip as Qualcomm publishes it is an
+      Runtimes: the Qualcomm AI Runtime (QAIRT) QNN CPU, HTP (NPU) and DSP
+      (Hexagon DSPs without an HTP) backends, the last two over FastRPC, and
+      TensorFlow Lite with XNNPACK (CPU) and its GPU delegate (OpenCL). The QAIRT SDK zip as Qualcomm publishes it is an
       input of the job; the model and tflite-run come with the image. Units
       the board does not have, or cannot run without an input, are
       skipped."
@@ -28,10 +28,13 @@ metadata:
         - qcs6490-rb3gen2
         - lemans-evk
         - qrb2210-arduino-imola
+        - qcs615-ride
 
 params:
     # What the board has, space separated: cpu:qnn, per Hexagon NSP
-    # npu<N>:qnn-htp:<Hexagon arch>:<QNN HTP device id>:<remoteproc>,
+    # npu<N>:qnn-htp:<Hexagon arch>:<QNN HTP device id>:<remoteproc>, per
+    # Hexagon DSP without an HTP (v66)
+    # npu<N>:qnn-dsp:<Hexagon arch>:<QNN device id>:<remoteproc>,
     # cpu:tflite[:<threads>] and gpu:tflite-gpu[:fp16|fp32]
     PUS: "cpu:qnn"
     # Units the board does not have, "<pu>=<reason>;...": reported as skip.
@@ -49,7 +52,7 @@ params:
     MAX_TFLITE_DIFF: "0.01"
     WARMUP: "5"
     RUNS: "50"
-    # "", htp-down (the NSP cases must fail), gpu-down (the GPU cases must
+    # "", htp-down (the NSP and DSP cases must fail), gpu-down (the GPU cases must
     # fail) or wrong-class (every top-1 case must fail)
     NEGATIVE: ""
 

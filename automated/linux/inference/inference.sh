@@ -20,6 +20,11 @@
 #   npu<N>:qnn-htp:<arch>:<device id>:<remoteproc>
 #                                QNN HTP backend on the Hexagon NSP <N>
 #                                (QNN device id) behind <remoteproc>
+#   npu<N>:qnn-dsp:<arch>:<device id>:<remoteproc>
+#                                QNN DSP backend on a Hexagon DSP with HVX
+#                                and no HTP (v66), behind <remoteproc>; the
+#                                8-bit model, checked against the QNN CPU
+#                                backend (QAIRT has no x86 DSP simulation)
 #   cpu:tflite[:<threads>]       TensorFlow Lite with XNNPACK on the CPU
 #                                (default 4 threads), tflite-run
 #   gpu:tflite-gpu[:fp16|fp32]   TensorFlow Lite GPU delegate (OpenCL),
@@ -37,8 +42,8 @@
 # cases are skipped; without tflite-run or the TensorFlow Lite model, the
 # TensorFlow Lite cases.
 #
-# NEGATIVE=htp-down stops each NSP's remoteproc before its run (and starts it
-# again afterwards), so its cases must fail; NEGATIVE=gpu-down hides the
+# NEGATIVE=htp-down stops the remoteproc of each NSP or DSP entry before its
+# run (and starts it again afterwards), so its cases must fail; NEGATIVE=gpu-down hides the
 # OpenCL platforms from the GPU entries (OCL_ICD_VENDORS on an empty
 # directory), so their cases must fail; NEGATIVE=wrong-class rotates the
 # expected classes, so every top-1 case must fail.
@@ -103,6 +108,9 @@ cases() {
         qnn-htp) echo "$1-qnn-htp-ready $1-qnn-htp-run $1-qnn-htp-top1 $1-qnn-htp-vs-cpu" \
                       "$1-qnn-htp-vs-host $1-qnn-htp-latency $1-qnn-htp-latency-p50" \
                       "$1-qnn-htp-latency-p90 $1-qnn-htp-speedup" ;;
+        qnn-dsp) echo "$1-qnn-dsp-ready $1-qnn-dsp-run $1-qnn-dsp-top1 $1-qnn-dsp-vs-cpu" \
+                      "$1-qnn-dsp-latency $1-qnn-dsp-latency-p50 $1-qnn-dsp-latency-p90" \
+                      "$1-qnn-dsp-speedup" ;;
         tflite) echo "$1-tflite-run $1-tflite-top1 $1-tflite-vs-host $1-tflite-latency" \
                      "$1-tflite-latency-p50 $1-tflite-latency-p90" ;;
         tflite-gpu) echo "$1-tflite-gpu-ready $1-tflite-gpu-run $1-tflite-gpu-top1" \
@@ -318,7 +326,7 @@ fi
 
 # QAIRT runtime: the zip as published, then only the files the QNN entries run
 have_qnn=0
-qnn_entries=$(for e in ${PUS}; do r=${e#*:}; case "${r%%:*}" in qnn|qnn-htp) echo "$e" ;; esac; done)
+qnn_entries=$(for e in ${PUS}; do r=${e#*:}; case "${r%%:*}" in qnn|qnn-htp|qnn-dsp) echo "$e" ;; esac; done)
 if [ -n "${qnn_entries}" ]; then
     if [ -z "${QAIRT_ZIP}" ] || [ ! -f "${QAIRT_ZIP}" ]; then
         warn_msg "no QAIRT SDK zip (${QAIRT_ZIP:-unset})"
@@ -341,9 +349,20 @@ ${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnIr.so"
         dsp=""
         for e in ${qnn_entries}; do
             r=${e#*:}
-            [ "${r%%:*}" = qnn-htp ] || continue
             arch=$(echo "$e" | cut -d: -f3)
             au=$(echo "${arch}" | tr v V)
+            if [ "${r%%:*}" = qnn-dsp ]; then
+                members="${members}
+${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnDsp.so
+${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnDspNetRunExtensions.so
+${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnDsp${au}Stub.so
+${QAIRT_ROOT}/lib/hexagon-${arch}/unsigned/libQnnDsp${au}Skel.so
+${QAIRT_ROOT}/lib/hexagon-${arch}/unsigned/libQnnDsp${au}.so
+${QAIRT_ROOT}/lib/hexagon-${arch}/unsigned/libQnnSystem.so"
+                dsp="${dsp:+${dsp};}${WORK}/${QAIRT_ROOT}/lib/hexagon-${arch}/unsigned"
+                continue
+            fi
+            [ "${r%%:*}" = qnn-htp ] || continue
             members="${members}
 ${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnHtp.so
 ${QAIRT_ROOT}/lib/${QNN_TARGET}/libQnnHtpPrepare.so
@@ -366,7 +385,7 @@ ${QAIRT_ROOT}/lib/hexagon-${arch}/unsigned/libQnnSystem.so"
             report_fail inference-qairt
         fi
         export LD_LIBRARY_PATH="${QLIB}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-        # FastRPC looks the HTP skel up in DSP_LIBRARY_PATH.
+        # FastRPC looks the HTP and DSP skels up in DSP_LIBRARY_PATH.
         if [ -n "${dsp}" ]; then
             export DSP_LIBRARY_PATH="${dsp}${DSP_LIBRARY_PATH:+;${DSP_LIBRARY_PATH}}"
             export ADSP_LIBRARY_PATH="${DSP_LIBRARY_PATH}"
@@ -411,14 +430,14 @@ for e in ${PUS}; do
         cpu_qnn_mean=${lat%% *}
         table "${pu}" qnn "${TOP1}" "${lat}" "QNN CPU backend, fp32"
         ;;
-    qnn-htp)
+    qnn-htp|qnn-dsp)
         if [ "${have_qnn}" -eq 0 ]; then
             skip_entry "$e" "no QAIRT runtime"
             continue
         fi
         dev=$(echo "$e" | cut -d: -f4)
         rp=$(echo "$e" | cut -d: -f5)
-        t=${pu}-qnn-htp
+        t=${pu}-${rt}
         TOP1="-"
         rpath=$(rproc_path "${rp}")
         stopped=0
@@ -429,7 +448,7 @@ for e in ${PUS}; do
             sleep 2
         fi
         state=$([ -n "${rpath}" ] && cat "${rpath}/state")
-        info_msg "${t}: QNN HTP device ${dev}, remoteproc ${rp} ${state:-not registered}"
+        info_msg "${t}: QNN $(echo "${rt#qnn-}" | tr a-z A-Z) device ${dev}, remoteproc ${rp} ${state:-not registered}"
         ls -l /dev/fastrpc-"${rp}"* 2>&1
         if { [ "${state}" = running ] || [ "${state}" = attached ]; } &&
            ls /dev/fastrpc-"${rp}" /dev/fastrpc-"${rp}"-secure > /dev/null 2>&1; then
@@ -437,7 +456,9 @@ for e in ${PUS}; do
         else
             report_fail "${t}-ready"
         fi
-        cat > "${WORK}/${t}-be.json" <<EOF
+        if [ "${rt}" = qnn-htp ]; then
+            be=libQnnHtp.so
+            cat > "${WORK}/${t}-be.json" <<EOF
 {
   "devices": [
     {
@@ -448,7 +469,7 @@ for e in ${PUS}; do
   ]
 }
 EOF
-        cat > "${WORK}/${t}-config.json" <<EOF
+            cat > "${WORK}/${t}-config.json" <<EOF
 {
   "backend_extensions": {
     "shared_library_path": "${QLIB}/libQnnHtpNetRunExtensions.so",
@@ -456,9 +477,14 @@ EOF
   }
 }
 EOF
+            cfg="${WORK}/${t}-config.json"
+        else
+            # the DSP backend's defaults: unsigned PD, its only device
+            be=libQnnDsp.so
+            cfg=""
+        fi
         ok=0
-        if qnn_run "${WORK}/${t}" libQnnHtp.so "${MODEL_DIR}/${HTP_DLC}" "${WORK}/list.txt" \
-                   "${WORK}/${t}-config.json" &&
+        if qnn_run "${WORK}/${t}" "${be}" "${MODEL_DIR}/${HTP_DLC}" "${WORK}/list.txt" "${cfg}" &&
            [ -n "$(result "${WORK}/${t}" $((n - 1)))" ]; then
             ok=1
             report_pass "${t}-run"
@@ -470,8 +496,9 @@ EOF
         else
             report_fail "${t}-top1"
         fi
-        # against the QNN CPU backend and the x86 HTP simulation of this
-        # Hexagon architecture (host-htp: a bundle with one reference only)
+        # against the QNN CPU backend and, for the HTP, the x86 HTP
+        # simulation of this Hexagon architecture (host-htp: a bundle with one
+        # reference only)
         arch=$(echo "$e" | cut -d: -f3)
         href="${MODEL_DIR}/host-htp-${arch}"
         [ -d "${href}" ] || href="${MODEL_DIR}/host-htp"
@@ -488,7 +515,7 @@ EOF
                 fi
                 mincos=$(awk -v a="${mincos:-${cs}}" -v b="${cs}" 'BEGIN { print (b < a) ? b : a }')
             fi
-            if [ "${ok}" -eq 1 ] && [ -n "${h}" ]; then
+            if [ "${rt}" = qnn-htp ] && [ "${ok}" -eq 1 ] && [ -n "${h}" ]; then
                 md=$(maxdiff "${h}" "${href}/${name}.raw")
                 info_msg "${t} ${name}: largest difference to the x86 HTP simulation (${href##*/}) ${md}"
                 awk -v a="${md}" -v m="${MAX_HOST_DIFF}" 'BEGIN { exit !(a <= m) }' && close=$((close + 1))
@@ -504,17 +531,19 @@ EOF
         else
             add_metric "${t}-vs-cpu" fail "${mincos}" cosine
         fi
-        if [ -z "${maxd}" ]; then
-            report_fail "${t}-vs-host"
-        elif [ "${close}" -eq "${n}" ]; then
-            add_metric "${t}-vs-host" pass "${maxd}" max-abs-diff
-        else
-            add_metric "${t}-vs-host" fail "${maxd}" max-abs-diff
+        if [ "${rt}" = qnn-htp ]; then
+            if [ -z "${maxd}" ]; then
+                report_fail "${t}-vs-host"
+            elif [ "${close}" -eq "${n}" ]; then
+                add_metric "${t}-vs-host" pass "${maxd}" max-abs-diff
+            else
+                add_metric "${t}-vs-host" fail "${maxd}" max-abs-diff
+            fi
         fi
         lat=""
         [ "${ok}" -eq 1 ] &&
-            qnn_run "${WORK}/${t}-timed" libQnnHtp.so "${MODEL_DIR}/${HTP_DLC}" \
-                    "${WORK}/timed-list.txt" "${WORK}/${t}-config.json" &&
+            qnn_run "${WORK}/${t}-timed" "${be}" "${MODEL_DIR}/${HTP_DLC}" \
+                    "${WORK}/timed-list.txt" "${cfg}" &&
             lat=$(qnn_latency "${WORK}/${t}-timed")
         latency_cases "${t}" "${lat}"
         # sanity: the NPU must beat the CPU backend of the same runtime
@@ -528,7 +557,11 @@ EOF
         else
             report_fail "${t}-speedup"
         fi
-        table "${pu}" qnn-htp "${TOP1}" "${lat}" "QNN HTP ${dev} (${rp}), 8-bit"
+        if [ "${rt}" = qnn-htp ]; then
+            table "${pu}" qnn-htp "${TOP1}" "${lat}" "QNN HTP ${dev} (${rp}), 8-bit"
+        else
+            table "${pu}" qnn-dsp "${TOP1}" "${lat}" "QNN DSP ${arch} (${rp}), 8-bit"
+        fi
         if [ "${stopped}" -eq 1 ]; then
             info_msg "negative control: starting ${rp} again"
             echo start > "${rpath}/state"
