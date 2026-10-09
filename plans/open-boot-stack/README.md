@@ -12,6 +12,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 |---|---|
 | `boot-fingerprint` | The build fingerprint in `/proc/version`, the rootfs (`/etc/issue`) and, where the firmware publishes it, the SMBIOS BIOS version (U-Boot). |
 | `boot-handoff` | Boot CPU (MPIDR), CPUs online, all CPUs started at EL2, KVM mode and `/dev/kvm`, the OP-TEE driver and `/dev/tee0`, PSCI CPU PM domains in OSI or PC mode. |
+| `cpu-features` | The AArch64 ID registers as Linux sees them (MRS from EL0 on every CPU, the KVM view of a fresh vCPU, the host NV field through KVM), decoded into FEAT_* names: every FEAT_* the board's CPUs have must be visible, so firmware that hides one fails. Pointer authentication is exercised with all five keys at EL0 (a wrong modifier must fault), at EL1 (key reset) and in a KVM guest; SVE/SME hwcaps, `/proc/cpuinfo` and RDVL/RDSVL must agree with the ID registers. |
 | `cpufreq-policy` | Every policy set to its lowest and highest frequency with the userspace governor: the frequency read back where the driver reports the running frequency, and a busy loop timed at both frequencies on one CPU of the policy, whose runtime ratio must match the frequency ratio. Then a stress-ng load on all online CPUs: the load completes and every policy scales up. |
 | `maxcpus` | With `maxcpus=N`: N CPUs online at boot, then every other CPU brought online (PSCI CPU_ON of a CPU the firmware has not started). |
 | `memtest` | With `memtest=N` and `CONFIG_MEMTEST`: the kernel's early memory test ran N patterns over all free memory and reported no bad memory. |
@@ -70,6 +71,9 @@ The memory test is a separate job booting a kernel image whose command
 line carries `memtest=N`: the console monitor, `memtest` first (its lines
 are among the first in the kernel log, which later messages can push
 out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
+
+`cpu-features` runs in the full job right after `boot-handoff`, before
+any test loads the DSPs or KVM guests.
 
 The KVM tests run in the full job, after `gpu-render` and before
 `kernel-health`, so a KVM warning shows up there too.
@@ -139,6 +143,7 @@ test.
 | `kvm-unit-tests` | `SKIP_INSTALL=true RESULTS=test REQUIRE_KVM=true CPUS=1-4`: the VMs stay on the Cortex-A78C cluster, since the two clusters have different PMUs and kvmtool gives a VM the PMU of the CPU it starts on. The runner skips the `gicv2-*` tests (the GIC has no GICv2 compatibility, so kvmtool cannot create a GICv2), the migration tests and `pci-test` (QEMU only) and the `mte-*` tests (no MTE). |
 | `kvm-guest` | `VCPUS=2 MEMORY=256` |
 | `inference` | `PUS="cpu:qnn npu0:qnn-htp:v75:0:cdsp cpu:tflite gpu:tflite-gpu"` |
+| `cpu-features` | `EXPECTED` = the FEAT_* list of the generator's board facts (38 features: the Cortex-A55/A78C common subset; pointer authentication is not in it, since the Cortex-A55 boot CPU lacks it and Linux exposes the common subset) |
 
 ## Parameters used on the RB3 Gen 2 (QCS6490) and the IQ-9075 EVK (Lemans)
 
@@ -163,6 +168,7 @@ test skels.
 | `video-codec` | `DEVICE=5a00000.video-codec DRIVER=qcom-venus DECODERS="h264 hevc vp9" ENCODERS="h264 hevc" FIRMWARE=/lib/firmware/qcom/venus-6.0/venus.mbn ENCODE_SIZE=1280x736` |
 | `remoteproc-restart` | `REMOTEPROCS=adsp EXPECTED_FAIL="adsp=the Linux audio drivers do not survive an ADSP stop"`: SoundWire reads the LPASS core the PAS shutdown has reset (synchronous external abort) and the audio clocks are then disabled twice |
 | `inference` | `PUS="cpu:tflite gpu:tflite-gpu" ABSENT="npu=QRB2210 has no Hexagon NSP;cpu-qnn=QAIRT 2.42 does not support QRB2210 (soc_id 524)"`: the QAIRT 2.42 CPU backend refuses the SoC (`Could not initialize backend`), while the same binary and model run on the same Cortex-A53 cores when `/sys/devices/soc0/soc_id` reads 675 or 497, so the QNN CPU entry is reported absent until QAIRT supports the QRB2210 |
+| `cpu-features` | `EXPECTED` = the FEAT_* list of the generator's board facts (17 features of the Cortex-A53) |
 
 The image is a Buildroot initramfs inside a UKI, so the LAVA overlay is
 written to an otherwise empty ext4 image flashed to the `rootfs`
