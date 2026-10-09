@@ -89,6 +89,9 @@ test may pass (the runner skips them all without `/dev/kvm`).
 `inference` runs after `fastrpc` in the full job. `PUS` names what the
 board has, one entry per PU and runtime (`cpu:qnn`,
 `npu<N>:qnn-htp:<Hexagon arch>:<QNN device id>:<remoteproc>` per NSP,
+`npu<N>:qnn-dsp:<Hexagon arch>:<QNN device id>:<remoteproc>` per Hexagon
+DSP with HVX but no HTP (v66, QAIRT's DSP backend, checked against the
+QNN CPU backend only: QAIRT has no x86 DSP simulation),
 `cpu:tflite` and `gpu:tflite-gpu`); `ABSENT` names what it does not have,
 with the reason. The TensorFlow Lite entries run the image's `tflite-run`
 on a TensorFlow Lite build of the same model: XNNPACK on the CPU, checked
@@ -143,6 +146,15 @@ test.
 |---|---|---|
 | `fastrpc` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1"` | `TESTS="adsp:adsp:0:0 cdsp:cdsp:3:0 cdsp-unsigned-pd:cdsp:3:1 cdsp1:cdsp1:4:0 cdsp1-unsigned-pd:cdsp1:4:1" NODES="gpdsp0:/dev/fastrpc-gdsp0 gpdsp1:/dev/fastrpc-gdsp1"` |
 | `inference` | `PUS="cpu:qnn npu0:qnn-htp:v68:0:cdsp cpu:tflite gpu:tflite-gpu"` | `PUS="cpu:qnn npu0:qnn-htp:v73:0:cdsp npu1:qnn-htp:v73:1:cdsp1 cpu:tflite gpu:tflite-gpu"` (both NSPs) |
+
+## Parameters used on the QCS615 Ride (Talos)
+
+| Definition | Parameters |
+|---|---|
+| `inference` | `PUS="cpu:qnn npu0:qnn-dsp:v66:0:cdsp cpu:tflite gpu:tflite-gpu"`: the CDSP is a Hexagon v66 with HVX and no HTP, run through QAIRT's DSP backend (QAIRT 2.42 knows SoC 680) in an unsigned PD, with the dsp-binaries QCS615-RIDE runtime of the CDSP firmware build; the GPU is the Adreno 612 |
+
+`fastrpc` does not run on the QCS615 Ride: qualcomm/fastrpc has no v66
+test skels.
 
 ## Parameters used on the Arduino UNO Q (QRB2210)
 
