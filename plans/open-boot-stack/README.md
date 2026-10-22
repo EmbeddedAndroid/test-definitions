@@ -12,6 +12,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 |---|---|
 | `boot-fingerprint` | The build fingerprint in `/proc/version`, the rootfs (`/etc/issue`) and, where the firmware publishes it, the SMBIOS BIOS version (U-Boot). |
 | `boot-handoff` | Boot CPU (MPIDR), CPUs online, all CPUs started at EL2, KVM mode and `/dev/kvm`, the OP-TEE driver and `/dev/tee0`, PSCI CPU PM domains in OSI or PC mode. |
+| `boot-time` | Boot time measured on the target, as measurements in seconds: the time before the kernel (the Arm generic timer count at a kernel log line minus that line's time stamp, where the counter starts at reset; skip when the kernel did not start at EL2 or runs under KVM, so a hypervisor may offset the counter, or the counter was reset, counts at another rate than the kernel uses or cannot be read), and the kernel log times of starting init and of the login prompt (the getty's start). |
 | `cpu-features` | The AArch64 ID registers as Linux sees them (MRS from EL0 on every CPU, the KVM view of a fresh vCPU, the host NV field through KVM), decoded into FEAT_* names: every FEAT_* the board's CPUs have must be visible, so firmware that hides one fails. Pointer authentication is exercised with all five keys at EL0 (a wrong modifier must fault), at EL1 (key reset) and in a KVM guest; SVE/SME hwcaps, `/proc/cpuinfo` and RDVL/RDSVL must agree with the ID registers. |
 | `cpufreq-policy` | Every policy set to its lowest and highest frequency with the userspace governor: the frequency read back where the driver reports the running frequency, and a busy loop timed at both frequencies on one CPU of the policy, whose runtime ratio must match the frequency ratio. Then a stress-ng load on all online CPUs: the load completes and every policy scales up. |
 | `maxcpus` | With `maxcpus=N`: N CPUs online at boot, then every other CPU brought online (PSCI CPU_ON of a CPU the firmware has not started). |
@@ -73,7 +74,11 @@ line carries `memtest=N`: the console monitor, `memtest` first (its lines
 are among the first in the kernel log, which later messages can push
 out), then `boot-fingerprint`, `boot-handoff` and `kernel-health`.
 
-`cpu-features` runs in the full job right after `boot-handoff`, before
+`boot-time` runs in the full job right after `boot-handoff`, on the cold
+boot (a warm reset need not reset the counter) and while the kernel log
+still holds its first lines.
+
+`cpu-features` runs in the full job right after `boot-time`, before
 any test loads the DSPs or KVM guests.
 
 The KVM tests run in the full job, after `gpu-render` and before
