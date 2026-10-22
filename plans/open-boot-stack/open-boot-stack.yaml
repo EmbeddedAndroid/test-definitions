@@ -12,6 +12,7 @@ metadata:
     memtest=N. The KVM tests (kvm-unit-tests, kvm-guest) run in the full
     plan; a negative control booting with kvm-arm.mode=none must fail
     them. cpu-hotplug runs in the full plan after the KVM tests.
+    boot-time runs after boot-handoff on the cold boot.
     inference runs a classifier on each processing unit (CPU, NPU) and
     reports its latency; the job provides the Qualcomm AI Runtime SDK
     zip, the image the model; a negative control with the NPU's
@@ -34,6 +35,9 @@ tests:
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 60
     - path: automated/linux/boot-handoff/boot-handoff.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 60
+    - path: automated/linux/boot-time/boot-time.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 60
     - path: automated/linux/cpufreq-policy/cpufreq-policy.yaml
