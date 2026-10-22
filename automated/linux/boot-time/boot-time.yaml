@@ -1,0 +1,29 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: boot-time
+    description: "Report the boot time measured on the target, in seconds
+      from the kernel's log clock zero: the time before that zero, the
+      firmware and the kernel's early setup (the Arm generic timer count at
+      a kernel log line, minus that line's time stamp, on a system whose
+      counter starts at reset; skipped when the
+      counter may be offset by a hypervisor, was reset, runs at another
+      rate than the kernel uses or cannot be read), and the times of
+      starting init and of the login prompt."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - performance
+    devices:
+        - monaco-arduino-monza
+
+run:
+    steps:
+        - cd ./automated/linux/boot-time/
+        - ./boot-time.sh
+        - ../../utils/send-to-lava.sh ./output/result.txt
