@@ -152,15 +152,30 @@ play() {
     fi
 }
 
-# restart <case>: crash the remoteproc, wait for it and for the card
+# card_instance: the inode of the card's control device node. devtmpfs
+# gives every new node a fresh inode, so a card that was removed and
+# registered again between two polls has another one.
+card_instance() {
+    local c
+    c="$(card_index)"
+    # shellcheck disable=SC2012 # one fixed device path, and no stat(1) on small images
+    [ -n "${c}" ] && ls -i "/dev/snd/controlC${c}" 2>/dev/null | awk '{ print $1 }'
+}
+
+# restart <case>: crash the remoteproc, wait for it and for the card. The
+# card counts as gone if a poll missed it or it came back as a new
+# instance (a DSP and card that recover within one poll interval).
 restart() {
     local gone=0
     local i=0
+    local inst
+    inst="$(card_instance)"
     echo 1 > "${RPROC_DEBUG}/crash"
     while [ "${i}" -lt "${WAIT_SECONDS}" ]; do
         sleep 1
         i=$((i + 1))
         [ -z "$(card_index)" ] && gone=1
+        [ -n "${inst}" ] && [ -n "$(card_instance)" ] && [ "$(card_instance)" != "${inst}" ] && gone=1
         if [ "$(cat "${RPROC}/state")" = running ] && [ "${gone}" -eq 1 ] &&
            [ -n "$(card_index)" ]; then
             info_msg "$1: ${REMOTEPROC} running and card back after ${i} s"
@@ -168,7 +183,7 @@ restart() {
             return 0
         fi
     done
-    info_msg "$1: after ${i} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent: ${gone}, card: '$(card_index)'"
+    info_msg "$1: after ${i} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent: ${gone}, card: '$(card_index)', instance ${inst} -> $(card_instance)"
     report_fail "$1"
     return 1
 }
