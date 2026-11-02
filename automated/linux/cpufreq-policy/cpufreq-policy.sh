@@ -60,6 +60,15 @@ real_freq() {
     return 1
 }
 
+# hottest: "<type> <millidegrees>" of the hottest thermal zone, to tell a
+# readback below the vote that thermal mitigation explains from one it
+# does not
+hottest() {
+    for z in /sys/class/thermal/thermal_zone*; do
+        [ -r "${z}/temp" ] && echo "$(cat "${z}/type") $(cat "${z}/temp")"
+    done 2> /dev/null | sort -n -k 2 | tail -n 1
+}
+
 show() {
     info_msg "online $(cat ${SYS_CPU}/online), offline $(cat ${SYS_CPU}/offline)"
     for p in "${SYS_CPU}"/cpufreq/policy*; do
@@ -237,6 +246,7 @@ drive() {
         elif [ "${r}" = "${t#*:}" ]; then
             add_metric "${name}-${t%%:*}" "pass" "${r}" "kHz"
         else
+            info_msg "${name}: hottest thermal zone $(hottest)"
             add_metric "${name}-${t%%:*}" "fail" "${r}" "kHz"
         fi
     done
