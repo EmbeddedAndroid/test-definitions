@@ -4,7 +4,8 @@
 #
 # Drive every cpufreq policy to its lowest and highest available frequency
 # with the userspace governor. Check that the hardware reports the
-# requested frequency back, and time a fixed busy loop pinned to one CPU of
+# requested frequency back, read with a loop pinned to the policy's first
+# CPU (idle if nothing can pin it), and time a fixed busy loop pinned to one CPU of
 # the policy at both frequencies: the runtime ratio must match the
 # frequency ratio. Then load all online CPUs with stress-ng under the
 # policy's own governor and check that the frequency scales up and the load
@@ -97,23 +98,32 @@ pin_cleanup() {
     [ -z "${CG_MOUNTED}" ] || umount "${CG_MOUNTED}"
 }
 
+# pinned <cpu> <script> [args]: exec sh -c <script> on <cpu> only. It
+# replaces the calling shell, so call it in a subshell ($(...) or &); in
+# the background, $! is then the loop itself and kill stops it.
+pinned() {
+    local cpu="$1"
+    local script="$2"
+    shift 2
+    if [ "${PIN}" = "taskset" ]; then
+        exec taskset -c "${cpu}" sh -c "${script}" pinned "$@"
+    else
+        echo "${cpu}" > "${CPUSET}/cpuset.cpus" || return
+        # shellcheck disable=SC2016
+        exec sh -c 'echo $$ > "$1/cgroup.procs" || exit 1; shift; eval "$0"' "${script}" "${CPUSET}" "$@"
+    fi
+}
+
 # busy <cpu> <iterations>: /proc/uptime ticks (centiseconds) a fixed loop
 # takes on <cpu>
 busy() {
-    local pin=""
-    if [ "${PIN}" = "taskset" ]; then
-        pin="taskset -c $1"
-    else
-        echo "$1" > "${CPUSET}/cpuset.cpus" || return
-    fi
     # shellcheck disable=SC2016
-    ${pin} sh -c '
-        [ -z "$2" ] || echo $$ > "$2/cgroup.procs" || exit 1
+    pinned "$1" '
         s="$(tr -d . < /proc/uptime | cut -d " " -f 1)"
         i=0
         while [ "${i}" -lt "$1" ]; do i=$((i + 1)); done
         e="$(tr -d . < /proc/uptime | cut -d " " -f 1)"
-        echo $((e - s))' busy "$2" "${CPUSET}"
+        echo $((e - s))' "$2"
 }
 
 # timed <policy dir> <lowest> <highest>: run the busy loop on the policy's
@@ -179,6 +189,7 @@ drive() {
     local old_min
     local old_max
     local r
+    local spin
     name="$(basename "${p}")"
     if [ -z "$(cat "${p}/affected_cpus")" ]; then
         info_msg "${name}: no online CPU"
@@ -204,11 +215,23 @@ drive() {
     echo "${hi}" > "${p}/scaling_max_freq"
     echo "${lo}" > "${p}/scaling_min_freq"
     echo userspace > "${p}/scaling_governor"
+    # EPSS reports the domain state, not the vote, while every CPU of the
+    # domain idles (SM8650 reads 460800 or 1382400 kHz whatever the vote,
+    # on stock firmware too): read back with a loop on the first CPU.
+    spin=""
+    if [ -n "${PIN}" ]; then
+        pinned "$(cut -d ' ' -f 1 "${p}/affected_cpus")" 'while :; do :; done' > /dev/null 2>&1 &
+        spin=$!
+    fi
     for t in min:"${lo}" max:"${hi}"; do
         echo "${t#*:}" > "${p}/scaling_setspeed"
         sleep "${SETTLE_SECONDS}"
+        if [ -n "${spin}" ] && ! kill -0 "${spin}" 2> /dev/null; then
+            spin=""
+        fi
+        [ -n "${spin}" ] || info_msg "${name}: no loop keeps the domain busy, reading it idle"
         r="$(cur_freq "${p}")"
-        info_msg "${name}: set ${t#*:} read ${r}"
+        info_msg "${name}: set ${t#*:} read ${r}${spin:+ (domain busy)}"
         if ! real_freq "${p}" "${r}"; then
             report_skip "${name}-${t%%:*}"
         elif [ "${r}" = "${t#*:}" ]; then
@@ -217,6 +240,10 @@ drive() {
             add_metric "${name}-${t%%:*}" "fail" "${r}" "kHz"
         fi
     done
+    if [ -n "${spin}" ]; then
+        kill "${spin}"
+        wait "${spin}"
+    fi
     timed "${p}" "${lo}" "${hi}"
     echo "${old}" > "${p}/scaling_governor"
     echo "${old_min}" > "${p}/scaling_min_freq"
