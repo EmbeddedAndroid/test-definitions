@@ -5,7 +5,8 @@
 # Drive every cpufreq policy to its lowest and highest available frequency
 # with the userspace governor. Check that the hardware reports the
 # requested frequency back, read with a loop pinned to the policy's first
-# CPU (idle if nothing can pin it), and time a fixed busy loop pinned to one CPU of
+# CPU (idle if nothing can pin it) and, for the lowest frequency, every other
+# policy held at its own lowest, and time a fixed busy loop pinned to one CPU of
 # the policy at both frequencies: the runtime ratio must match the
 # frequency ratio. Then load all online CPUs with stress-ng under the
 # policy's own governor and check that the frequency scales up and the load
@@ -20,6 +21,8 @@ export RESULT_FILE
 ONLINE_ALL="false"
 STRESS_SECONDS="60"
 SETTLE_SECONDS="1"
+# Readbacks per requested frequency, 0.2 s apart; every one must match.
+SAMPLES=5
 TIMED_NEGATIVE="false"
 # Shortest timed run at the highest frequency in /proc/uptime ticks
 # (centiseconds), and the allowed deviation of the runtime ratio from the
@@ -178,6 +181,32 @@ timed() {
     fi
 }
 
+# hold_low <policy dir>: put every other policy with an online CPU at its
+# lowest frequency under userspace, saving its governor in OUTPUT. Domains
+# sharing a voltage rail raise each other (EPSS shared-rail boost: on SM8650
+# the A720 CPUs 5-6 and the X4 CPU 7 share APC1), so the lowest frequency of
+# one domain is only defined while the rail-mates do not need more voltage.
+hold_low() {
+    local q
+    for q in "${SYS_CPU}"/cpufreq/policy*; do
+        [ "${q}" != "$1" ] || continue
+        [ -n "$(cat "${q}/affected_cpus")" ] || continue
+        grep -qw userspace "${q}/scaling_available_governors" || continue
+        cat "${q}/scaling_governor" > "${OUTPUT}/$(basename "${q}").gov"
+        echo userspace > "${q}/scaling_governor"
+        tr ' ' '\n' < "${q}/scaling_available_frequencies" | grep -E '^[0-9]+$' | sort -n | head -n 1 > "${q}/scaling_setspeed"
+    done
+}
+
+release_low() {
+    local q
+    for q in "${SYS_CPU}"/cpufreq/policy*; do
+        [ -r "${OUTPUT}/$(basename "${q}").gov" ] || continue
+        cat "${OUTPUT}/$(basename "${q}").gov" > "${q}/scaling_governor"
+        rm "${OUTPUT}/$(basename "${q}").gov"
+    done
+}
+
 # drive <policy dir>: lowest and highest frequency under userspace
 drive() {
     local p="$1"
@@ -189,6 +218,8 @@ drive() {
     local old_min
     local old_max
     local r
+    local all
+    local i
     local spin
     name="$(basename "${p}")"
     if [ -z "$(cat "${p}/affected_cpus")" ]; then
@@ -224,14 +255,29 @@ drive() {
         spin=$!
     fi
     for t in min:"${lo}" max:"${hi}"; do
+        [ "${t%%:*}" = max ] || hold_low "${p}"
         echo "${t#*:}" > "${p}/scaling_setspeed"
         sleep "${SETTLE_SECONDS}"
         if [ -n "${spin}" ] && ! kill -0 "${spin}" 2> /dev/null; then
             spin=""
         fi
         [ -n "${spin}" ] || info_msg "${name}: no loop keeps the domain busy, reading it idle"
-        r="$(cur_freq "${p}")"
-        info_msg "${name}: set ${t#*:} read ${r}${spin:+ (domain busy)}"
+        # One readback cannot tell a steady frequency from a passing one:
+        # report the first of SAMPLES that differs, or the request.
+        all=""
+        r=""
+        i=0
+        while [ "${i}" -lt "${SAMPLES}" ]; do
+            [ "${i}" -eq 0 ] || sleep 0.2
+            all="${all} $(cur_freq "${p}")"
+            i=$((i + 1))
+        done
+        for i in ${all}; do
+            [ -n "${r}" ] || [ "${i}" = "${t#*:}" ] || r="${i}"
+        done
+        [ -n "${r}" ] || r="${t#*:}"
+        [ "${t%%:*}" = max ] || release_low
+        info_msg "${name}: set ${t#*:} read${all}${spin:+ (domain busy)}"
         if ! real_freq "${p}" "${r}"; then
             report_skip "${name}-${t%%:*}"
         elif [ "${r}" = "${t#*:}" ]; then
