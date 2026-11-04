@@ -152,15 +152,27 @@ play() {
     fi
 }
 
+# card_instance: id of the card's sysfs directory; kernfs ids are allocated
+# cyclically, so a card that is freed and registered again gets a new one even
+# when it comes back between two polls
+card_instance() {
+    local c
+    c="$(card_index)"
+    [ -n "${c}" ] && ls -di "/sys/class/sound/card${c}/" 2>/dev/null | awk '{ print $1 }'
+}
+
 # restart <case>: crash the remoteproc, wait for it and for the card
 restart() {
     local gone=0
     local i=0
+    local id0
+    id0="$(card_instance)"
     echo 1 > "${RPROC_DEBUG}/crash"
     while [ "${i}" -lt "${WAIT_SECONDS}" ]; do
         sleep 1
         i=$((i + 1))
         [ -z "$(card_index)" ] && gone=1
+        [ -n "$(card_instance)" ] && [ "$(card_instance)" != "${id0}" ] && gone=1
         if [ "$(cat "${RPROC}/state")" = running ] && [ "${gone}" -eq 1 ] &&
            [ -n "$(card_index)" ]; then
             info_msg "$1: ${REMOTEPROC} running and card back after ${i} s"
@@ -168,7 +180,7 @@ restart() {
             return 0
         fi
     done
-    info_msg "$1: after ${i} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent: ${gone}, card: '$(card_index)'"
+    info_msg "$1: after ${i} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent or re-created: ${gone}, card: '$(card_index)'"
     report_fail "$1"
     return 1
 }
