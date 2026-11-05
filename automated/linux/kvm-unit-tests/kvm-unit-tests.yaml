@@ -39,9 +39,13 @@ params:
     # true: report kvm-device, failing when there is no /dev/kvm (the
     # runner then skips every test).
     REQUIRE_KVM: "false"
+    # Tests to run (run_tests.sh test names); empty: all of them.
+    TESTS: ""
+    # Runs of the tests; with RESULTS=test a test fails if any run failed.
+    ROUNDS: "1"
 
 run:
     steps:
         - cd ./automated/linux/kvm-unit-tests/
-        - ./kvm-unit-tests.sh -s "${SKIP_INSTALL}" -m "${SMP}" -g "${GIT_REF}" -r "${RESULTS}" -c "${CPUS}" -k "${REQUIRE_KVM}"
+        - ./kvm-unit-tests.sh -s "${SKIP_INSTALL}" -m "${SMP}" -g "${GIT_REF}" -r "${RESULTS}" -c "${CPUS}" -k "${REQUIRE_KVM}" -T "${TESTS}" -n "${ROUNDS}"
         - ../../utils/send-to-lava.sh ./output/result.txt

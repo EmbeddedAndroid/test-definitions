@@ -12,6 +12,8 @@ GIT_REF="master"
 RESULTS="tap"
 CPUS=""
 REQUIRE_KVM="false"
+TESTS=""
+ROUNDS=1
 
 usage() {
     echo "Usage: $0 [-s <true|false>]
@@ -19,11 +21,13 @@ usage() {
                     [-g git-reference]
                     [-r <tap|test>]
                     [-c <host cpu list>]
-                    [-k <true|false>]" 1>&2
+                    [-k <true|false>]
+                    [-T "<test> ..."]
+                    [-n <rounds>]" 1>&2
     exit 1
 }
 
-while getopts "s:m:g:r:c:k:h" o; do
+while getopts "s:m:g:r:c:k:T:n:h" o; do
   case "$o" in
     s) SKIP_INSTALL="${OPTARG}" ;;
     m) SMP="${OPTARG}" ;;
@@ -31,21 +35,32 @@ while getopts "s:m:g:r:c:k:h" o; do
     r) RESULTS="${OPTARG}" ;;
     c) CPUS="${OPTARG}" ;;
     k) REQUIRE_KVM="${OPTARG}" ;;
+    T) TESTS="${OPTARG}" ;;
+    n) ROUNDS="${OPTARG}" ;;
     h|*) usage ;;
   esac
 done
 
-# The runner's verdict lines ("PASS|FAIL|SKIP <test> ...", coloured) as
-# "<test> pass|fail|skip"
+# The runner's verdict lines ("PASS|FAIL|SKIP <test> ...", coloured) of
+# a log as "<test> pass|fail|skip"
 verdicts() {
-    sed "s/$(printf '\033')\[[0-9;]*m//g" "${RESULT_LOG}" |
+    sed "s/$(printf '\033')\[[0-9;]*m//g" "${1:-${RESULT_LOG}}" |
         awk '$1 ~ /^(PASS|FAIL|SKIP)$/ && NF >= 2 { print $2, tolower($1) }'
+}
+
+# One verdict per test over all rounds, in run order: fail if any round
+# failed, else pass if any passed, else skip.
+round_verdicts() {
+    verdicts | awk '
+        !($1 in v) { order[n++] = $1; v[$1] = $2; next }
+        $2 == "fail" || ($2 == "pass" && v[$1] == "skip") { v[$1] = $2 }
+        END { for (i = 0; i < n; i++) print order[i], v[order[i]] }'
 }
 
 parse_output() {
     # Parse input test names and results log to results file
     if [ "${RESULTS}" = "test" ]; then
-        verdicts | tee -a "${RESULT_FILE}"
+        round_verdicts | tee -a "${RESULT_FILE}"
     else
         ./parse-output.py < "${RESULT_LOG}" | tee -a "${RESULT_FILE}"
     fi
@@ -99,14 +114,20 @@ kvm_unit_tests_run_test() {
     if [ -n "${CPUS}" ] && ! pin_cpus; then
         warn_msg "cannot hold the VMs on CPUs ${CPUS}"
     fi
-    # shellcheck disable=SC2086
-    ${PIN} ./run_tests.sh ${flags} | tee -a "${RESULT_LOG}"
-    unpin_cpus
-    # The output of each failed test
-    verdicts | awk '$2 == "fail" { print $1 }' | while read -r t; do
-        info_msg "${t} log:"
-        cat "logs/${t}.log"
+    round=1
+    while [ "${round}" -le "${ROUNDS}" ]; do
+        [ "${ROUNDS}" -eq 1 ] || info_msg "round ${round} of ${ROUNDS}"
+        # shellcheck disable=SC2086
+        ${PIN} ./run_tests.sh ${flags} ${TESTS} | tee "${OUTPUT}/round.txt"
+        cat "${OUTPUT}/round.txt" >> "${RESULT_LOG}"
+        # The output of each failed test, before the next round replaces it
+        verdicts "${OUTPUT}/round.txt" | awk '$2 == "fail" { print $1 }' | while read -r t; do
+            info_msg "${t} log (round ${round}):"
+            cat "logs/${t}.log"
+        done
+        round=$((round + 1))
     done
+    unpin_cpus
 }
 
 kvm_unit_tests_build_test() {
