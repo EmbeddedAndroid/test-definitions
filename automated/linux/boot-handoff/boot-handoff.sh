@@ -99,7 +99,7 @@ else
     case "${KVM}" in
         vhe) mode="VHE mode initialized successfully" ;;
         nvhe) mode="Hyp nVHE mode initialized successfully" ;;
-        protected) mode="Protected nVHE mode initialized successfully" ;;
+        protected) mode="Protected [hn]VHE mode initialized successfully" ;;
         *) mode="mode initialized successfully" ;;
     esac
     if grep -E "kvm \[[0-9]+\]: " "${DMESG}" | grep -q "${mode}"; then
