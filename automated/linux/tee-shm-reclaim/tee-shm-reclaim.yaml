@@ -1,0 +1,53 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: tee-shm-reclaim
+    description: "Register user memory with the TEE, release it and
+      register the same pages again, several rounds, for buffers whose
+      pages are physically scattered (the largest needs a fragmented FF-A
+      descriptor). Over FF-A this is FFA_MEM_SHARE and FFA_MEM_RECLAIM;
+      under pKVM each reclaim also makes the hypervisor retrieve the
+      descriptor from the SPMC; over the OP-TEE SMC ABI it is dynamic
+      shared memory registration. Fails if a registration fails or the
+      kernel logs a failed reclaim. Skipped, with the reason, without
+      /dev/tee0, without the tee-shm-reclaim helper (installed, next to
+      the script, or built here from tee-shm-reclaim.c) or when the TEE
+      cannot register user memory."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - monaco-arduino-monza
+        - qrb2210-arduino-imola
+        - qcs6490-rb3gen2
+        - qcs615-ride
+        - lemans-evk
+        - sm8750-mtp
+        - kaanapali-mtp
+        - eliza-evk-emmc
+
+params:
+    ROUNDS: "20"
+    # Buffer sizes in pages; the last must reach MIN_RANGES physical ranges.
+    PAGES: "1 64 1024"
+    # 300 ranges is about 4.9 KiB of descriptor: more than one 4 KiB
+    # FF-A buffer, so the share and the retrieve response are fragmented.
+    MIN_RANGES: "300"
+    # any, or ffa to require the OP-TEE driver to be bound over FF-A.
+    TRANSPORT: "any"
+    # The helper binary; empty takes the installed one, then one next to
+    # the script, then builds it.
+    BIN: ""
+
+run:
+    steps:
+        - cd ./automated/linux/tee-shm-reclaim/
+        - ./tee-shm-reclaim.sh -r "${ROUNDS}" -p "${PAGES}" -m "${MIN_RANGES}"
+          -t "${TRANSPORT}" -b "${BIN}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
