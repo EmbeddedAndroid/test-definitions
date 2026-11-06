@@ -29,6 +29,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `kvm-guest` | A Linux guest under KVM with kvmtool (2 vCPUs, virtio console): it reaches userspace with the vCPUs asked for, runs a command sent over its console and powers off, so that kvmtool exits 0; the time to its ready line is a measurement. |
 | `cpu-hotplug` | CPU hotplug through PSCI CPU_OFF and CPU_ON: every hotpluggable CPU offline and online for some rounds, idle and under stress-ng load, then all together; then one loop per CPU, all in parallel under load, taking its CPU offline and at once back online, so that CPU_ON reaches the firmware as soon as the CPU is reported off. A hotplug write that does not return, a CPU that does not come back, an online mask that is not restored or a PSCI error or kernel warning fails. |
 | `kernel-health` | Kernel warnings, BUGs, oopses, call traces and panics since boot. |
+| `suspend-idle` | CPU and cluster idle, then system suspend. Idle: over an idle period, the entries, residency and refused entries of every cpuidle state of the online CPUs and of every idle state of the PSCI power domains (genpd, through debugfs), and the PSCI mode (OSI or PC). A cpuidle state fails when it is never entered or when the platform refuses it (PSCI CPU_SUSPEND error, cpuidle "rejected") more often than it enters it; a CPU or cluster domain fails when it reaches none of its states (genpd counts what Linux requests; the firmware's refusals show in the cpuidle counters); `IDLE_SKIP` exempts a state or domain with the reason. Suspend: `CYCLES` suspends per mode in `MODES` (default: the kernel's mem_sleep default), each woken by the RTC alarm after `SLEEP` seconds; a cycle fails on a failed or uncounted suspend, a wake that is not the RTC, a bound device, online CPU or running remoteproc missing after the resume, a remoteproc crash, a kernel warning or suspend error, or, in s2idle, a CPU that did not stay in its deepest idle state for at least half of the suspend. Entry and resume times (kernel log) are measurements. Without a system sleep state or an RTC with a wake alarm the suspend cases are skipped with the reason. |
 | `systemready-acs` | The results of an Arm SystemReady devicetree band ACS run, read from Arm's parsed results on the ACS results partition: one case per SCT test, BSA or PFDI rule, FWTS test, DT check and ACS Linux tool check, and Arm's compliance verdict per suite (see below). |
 
 ## Console checks in the LAVA job
@@ -83,6 +84,12 @@ The KVM tests run in the full job, after `gpu-render` and before
 `tee-shm-reclaim` runs in the full job right after `optee-xtest`, with
 the default parameters; `TRANSPORT=ffa` also requires the OP-TEE driver to
 be bound over FF-A, for a stack whose OP-TEE is an FF-A partition.
+
+`suspend-idle` runs last in the full job, after the checks of the warm
+reboot and before the poweroff, in a test action of its own whose timeout
+is skipped, so that a resume that never returns still lets the job restore
+the board's own firmware. Its kernel log checks cover the suspend cycles
+only (`kernel-health` has run before).
 
 `remoteproc-restart` runs in the full job after the DSP and audio tests,
 so that they see the remoteprocs as booted, and before `kernel-health`,
