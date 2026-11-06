@@ -1,0 +1,61 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: suspend-idle
+    description: "CPU and cluster idle residency, then system suspend and
+      resume woken by the RTC alarm. Idle: the entries, residency and
+      refused entries of every cpuidle state of the online CPUs and of every
+      idle state of the PSCI power domains over an idle period, and the PSCI
+      mode (OSI or PC); a CPU idle state never entered, or refused more
+      often than entered, fails, and so does a CPU or cluster domain that
+      reaches none of its states. Suspend: N cycles per mem_sleep mode; a
+      cycle fails on a failed or uncounted suspend, a wake that is not the
+      RTC, a device, CPU or remoteproc missing or crashed after the resume,
+      a kernel warning, or, in s2idle, a CPU that did not stay in its
+      deepest idle state. Entry and resume times are measurements.
+      Skipped, with the reason, without a system sleep state or an RTC with
+      a wake alarm."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - monaco-arduino-monza
+        - qrb2210-arduino-imola
+        - qcs6490-rb3gen2
+        - qcs615-ride
+        - lemans-evk
+        - sm8750-mtp
+        - kaanapali-mtp
+        - eliza-evk-emmc
+        - hamoa-iot-evk
+
+params:
+    # Suspend cycles per mode, and the RTC alarm of each (seconds).
+    CYCLES: "3"
+    SLEEP: "10"
+    # mem_sleep modes to suspend to, e.g. "s2idle deep"; empty: the
+    # kernel's default; "freeze" writes freeze to /sys/power/state.
+    MODES: ""
+    # Seconds of idle over which the idle counters are read.
+    IDLE_SECONDS: "30"
+    # Expected PSCI CPU idle coordination: osi, pc, or empty to report it.
+    PSCI_MODE: ""
+    # Idle states and domains not required, with the reason:
+    # "<cpuidle state name>=<reason>;<genpd domain>=<reason>".
+    IDLE_SKIP: ""
+    # true: fail rather than skip without a sleep state or RTC wake alarm.
+    REQUIRE_SUSPEND: "false"
+
+run:
+    steps:
+        - cd ./automated/linux/suspend-idle/
+        - ./suspend-idle.sh -P idle -i "${IDLE_SECONDS}" -p "${PSCI_MODE}" -x "${IDLE_SKIP}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
+        - ./suspend-idle.sh -P suspend -c "${CYCLES}" -s "${SLEEP}" -m "${MODES}" -r "${REQUIRE_SUSPEND}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
