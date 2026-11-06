@@ -22,6 +22,7 @@ is empty, or whose hardware or tool is missing, reports `skip` rather than
 | `alsa-dsp-restart` | Playback, a DSP restart while idle and one in the middle of a stream: the DSP and the card come back, the stream ends instead of hanging, playback works again. |
 | `remoteproc-restart` | Each remoteproc stopped and started through sysfs, three times: offline after the stop, running after the start, its rpmsg channels back with the same drivers, no remoteproc crash, warning or oops in the kernel log. Remoteprocs known not to survive a restart are listed with a reason and reported as skip. |
 | `optee-xtest` | The OP-TEE regression suite. |
+| `tee-shm-reclaim` | TEE shared memory registered, released and registered again for 20 rounds, for buffers of 1, 64 and 1024 physically scattered pages (the largest needs a fragmented FF-A descriptor): every registration succeeds and the kernel logs no failed reclaim. Over FF-A this is FFA_MEM_SHARE and FFA_MEM_RECLAIM, under pKVM with the hypervisor's retrieve from the SPMC; over the OP-TEE SMC ABI, dynamic shared memory. The helper comes with the image (qcom-buildroot `tee_shm_reclaim_ext`); without it, without `/dev/tee0` or without dynamic shared memory the cases are skipped with the reason. |
 | `gpu-render` | A DRM render node and a headless render with pixel readback (`egl-readback`). |
 | `video-codec` | V4L2 stateful codec through FFmpeg's v4l2m2m wrappers: hardware decodes of H.264, HEVC and VP9 reference streams match the software decode frame by frame (MD5), a hardware encode decodes to the right frame count with a minimum PSNR; decodes after runtime suspend and after a driver rebind; without its firmware file the driver must not probe, or must not decode if it loads the firmware on the first open. Needs FFmpeg 7.0 or later and the streams in `/usr/share/video-codec` (qcom-buildroot `qcom/video`). |
 | `kvm-unit-tests` | The [KVM unit tests](https://gitlab.com/kvm-unit-tests/kvm-unit-tests) against `/dev/kvm`: small guests that each check part of KVM and its virtual hardware (vectors, SMP, GIC and ITS, timers, PSCI, PMU, debug, FPU context, micro benchmarks). Runs a prebuilt copy in `/opt/kvm-unit-tests` (built for kvmtool on the boards below), one case per test. |
@@ -78,6 +79,10 @@ any test loads the DSPs or KVM guests.
 
 The KVM tests run in the full job, after `gpu-render` and before
 `kernel-health`, so a KVM warning shows up there too.
+
+`tee-shm-reclaim` runs in the full job right after `optee-xtest`, with
+the default parameters; `TRANSPORT=ffa` also requires the OP-TEE driver to
+be bound over FF-A, for a stack whose OP-TEE is an FF-A partition.
 
 `remoteproc-restart` runs in the full job after the DSP and audio tests,
 so that they see the remoteprocs as booted, and before `kernel-health`,

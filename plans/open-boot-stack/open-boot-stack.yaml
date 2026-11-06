@@ -57,6 +57,9 @@ tests:
     - path: automated/linux/optee/optee-xtest.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 2400
+    - path: automated/linux/tee-shm-reclaim/tee-shm-reclaim.yaml
+      repository: https://github.com/Linaro/test-definitions.git
+      timeout: 120
     - path: automated/linux/gpu-render/gpu-render.yaml
       repository: https://github.com/Linaro/test-definitions.git
       timeout: 300
