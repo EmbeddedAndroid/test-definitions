@@ -1,0 +1,36 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: tee-shm-reclaim
+    description: "Register user memory with the TEE, release it and
+      register the same pages again, several rounds, for buffers whose
+      pages are physically scattered (the largest needs a fragmented FF-A
+      descriptor). Over FF-A this is FFA_MEM_SHARE and FFA_MEM_RECLAIM;
+      under pKVM each reclaim also makes the hypervisor retrieve the
+      descriptor from the SPMC. Fails if a registration fails or the
+      kernel logs a failed reclaim. Needs the tee-shm-reclaim binary
+      built from tee-shm-reclaim.c next to the script."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - buildroot
+        - openembedded
+    scope:
+        - functional
+    devices:
+        - eliza-evk-emmc
+
+params:
+    ROUNDS: "20"
+    # Buffer sizes in pages; the last must reach MIN_RANGES physical ranges.
+    PAGES: "1 64 1024"
+    # 300 ranges is about 4.9 KiB of descriptor: more than one 4 KiB
+    # FF-A buffer, so the share and the retrieve response are fragmented.
+    MIN_RANGES: "300"
+    # any, or ffa to require the OP-TEE driver to be bound over FF-A.
+    TRANSPORT: "any"
+
+run:
+    steps:
+        - cd ./automated/linux/tee-shm-reclaim/
+        - ./tee-shm-reclaim.sh -r "${ROUNDS}" -p "${PAGES}" -m "${MIN_RANGES}" -t "${TRANSPORT}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
