@@ -168,19 +168,19 @@ restart() {
     local id0
     id0="$(card_instance)"
     echo 1 > "${RPROC_DEBUG}/crash"
-    while [ "${i}" -lt "${WAIT_SECONDS}" ]; do
-        sleep 1
+    while [ "${i}" -lt $((WAIT_SECONDS * 5)) ]; do
+        sleep 0.2
         i=$((i + 1))
         [ -z "$(card_index)" ] && gone=1
         [ -n "$(card_instance)" ] && [ "$(card_instance)" != "${id0}" ] && gone=1
         if [ "$(cat "${RPROC}/state")" = running ] && [ "${gone}" -eq 1 ] &&
            [ -n "$(card_index)" ]; then
-            info_msg "$1: ${REMOTEPROC} running and card back after ${i} s"
-            add_metric "$1" "pass" "${i}" "s"
+            info_msg "$1: ${REMOTEPROC} running and card back after $((i / 5)).$((i % 5 * 2)) s"
+            add_metric "$1" "pass" "$((i / 5)).$((i % 5 * 2))" "s"
             return 0
         fi
     done
-    info_msg "$1: after ${i} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent or re-created: ${gone}, card: '$(card_index)'"
+    info_msg "$1: after ${WAIT_SECONDS} s ${REMOTEPROC} is $(cat "${RPROC}/state"), card seen absent or re-created: ${gone}, card: '$(card_index)'"
     report_fail "$1"
     return 1
 }
