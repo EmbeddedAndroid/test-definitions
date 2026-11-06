@@ -39,9 +39,15 @@ params:
     # true: report kvm-device, failing when there is no /dev/kvm (the
     # runner then skips every test).
     REQUIRE_KVM: "false"
+    # The tests the runner skips unless the target is QEMU (pci-test, the
+    # live migration tests) run again from a copy built for QEMU in
+    # QEMU_DIR on qemu-system-aarch64. auto: when both are there; true:
+    # also report qemu-available, failing without them; false: never.
+    QEMU: "auto"
+    QEMU_DIR: "/opt/kvm-unit-tests-qemu"
 
 run:
     steps:
         - cd ./automated/linux/kvm-unit-tests/
-        - ./kvm-unit-tests.sh -s "${SKIP_INSTALL}" -m "${SMP}" -g "${GIT_REF}" -r "${RESULTS}" -c "${CPUS}" -k "${REQUIRE_KVM}"
+        - ./kvm-unit-tests.sh -s "${SKIP_INSTALL}" -m "${SMP}" -g "${GIT_REF}" -r "${RESULTS}" -c "${CPUS}" -k "${REQUIRE_KVM}" -q "${QEMU}" -Q "${QEMU_DIR}"
         - ../../utils/send-to-lava.sh ./output/result.txt

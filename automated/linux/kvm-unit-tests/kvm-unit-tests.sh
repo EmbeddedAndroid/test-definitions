@@ -12,6 +12,9 @@ GIT_REF="master"
 RESULTS="tap"
 CPUS=""
 REQUIRE_KVM="false"
+QEMU="auto"
+QEMU_DIR="/opt/kvm-unit-tests-qemu"
+QEMU_LOG="${OUTPUT}/result_log_qemu.txt"
 
 usage() {
     echo "Usage: $0 [-s <true|false>]
@@ -19,11 +22,13 @@ usage() {
                     [-g git-reference]
                     [-r <tap|test>]
                     [-c <host cpu list>]
-                    [-k <true|false>]" 1>&2
+                    [-k <true|false>]
+                    [-q <auto|true|false>]
+                    [-Q <kvm-unit-tests for QEMU dir>]" 1>&2
     exit 1
 }
 
-while getopts "s:m:g:r:c:k:h" o; do
+while getopts "s:m:g:r:c:k:q:Q:h" o; do
   case "$o" in
     s) SKIP_INSTALL="${OPTARG}" ;;
     m) SMP="${OPTARG}" ;;
@@ -31,23 +36,48 @@ while getopts "s:m:g:r:c:k:h" o; do
     r) RESULTS="${OPTARG}" ;;
     c) CPUS="${OPTARG}" ;;
     k) REQUIRE_KVM="${OPTARG}" ;;
+    q) QEMU="${OPTARG}" ;;
+    Q) QEMU_DIR="${OPTARG}" ;;
     h|*) usage ;;
   esac
 done
 
-# The runner's verdict lines ("PASS|FAIL|SKIP <test> ...", coloured) as
-# "<test> pass|fail|skip"
+uncolour() {
+    sed "s/$(printf '\033')\[[0-9;]*m//g" "$@"
+}
+
+# The runner's verdict lines ("PASS|FAIL|SKIP <test> ...", coloured) of a
+# log (default RESULT_LOG) as "<test> pass|fail|skip"
 verdicts() {
-    sed "s/$(printf '\033')\[[0-9;]*m//g" "${RESULT_LOG}" |
+    uncolour "${1:-${RESULT_LOG}}" |
         awk '$1 ~ /^(PASS|FAIL|SKIP)$/ && NF >= 2 { print $2, tolower($1) }'
+}
+
+# The tests a run skipped because they need QEMU (unittests.cfg
+# disabled_if [[ "$TARGET" != qemu ]]): verdict lines, or TAP skip lines.
+qemu_only() {
+    uncolour "${RESULT_LOG}" | awk '/!= *qemu/ {
+        if ($1 == "SKIP") print $2
+        else if ($1 == "ok" && $3 == "-") { sub(/:$/, "", $4); print $4 } }' | sort -u
+}
+
+# RESULT_LOG without the skip lines of the tests run again under QEMU.
+kvmtool_log() {
+    uncolour "${RESULT_LOG}" | awk -v t=" ${QEMU_TESTS} " '/!= *qemu/ {
+        n = ($1 == "SKIP") ? $2 : ($1 == "ok" && $3 == "-") ? $4 : ""
+        sub(/:$/, "", n)
+        if (n != "" && index(t, " " n " ")) next } { print }'
 }
 
 parse_output() {
     # Parse input test names and results log to results file
+    kvmtool_log > "${OUTPUT}/result_log_kvmtool.txt"
     if [ "${RESULTS}" = "test" ]; then
-        verdicts | tee -a "${RESULT_FILE}"
+        verdicts "${OUTPUT}/result_log_kvmtool.txt" | tee -a "${RESULT_FILE}"
+        [ -z "${QEMU_TESTS}" ] || verdicts "${QEMU_LOG}" | tee -a "${RESULT_FILE}"
     else
-        ./parse-output.py < "${RESULT_LOG}" | tee -a "${RESULT_FILE}"
+        ./parse-output.py < "${OUTPUT}/result_log_kvmtool.txt" | tee -a "${RESULT_FILE}"
+        [ -z "${QEMU_TESTS}" ] || ./parse-output.py < "${QEMU_LOG}" | tee -a "${RESULT_FILE}"
     fi
 }
 
@@ -101,12 +131,40 @@ kvm_unit_tests_run_test() {
     fi
     # shellcheck disable=SC2086
     ${PIN} ./run_tests.sh ${flags} | tee -a "${RESULT_LOG}"
-    unpin_cpus
     # The output of each failed test
     verdicts | awk '$2 == "fail" { print $1 }' | while read -r t; do
         info_msg "${t} log:"
         cat "logs/${t}.log"
     done
+    kvm_unit_tests_run_qemu "${flags}"
+    unpin_cpus
+}
+
+# The tests the kvmtool run skipped as QEMU only (PCI test device, live
+# migration), run again with the copy built for QEMU on qemu-system-aarch64
+# with KVM, on the same CPUs.
+QEMU_TESTS=""
+kvm_unit_tests_run_qemu() {
+    case "${QEMU}" in false|False) return 0 ;; esac
+    tests="$(qemu_only | tr '\n' ' ')"
+    [ -n "${tests}" ] || return 0
+    if [ ! -x "${QEMU_DIR}/run_tests.sh" ] || ! command -v qemu-system-aarch64 > /dev/null; then
+        info_msg "no qemu-system-aarch64 or ${QEMU_DIR}: the QEMU only tests stay skipped (${tests})"
+        case "${QEMU}" in true|True) report_fail "qemu-available" ;; esac
+        return 0
+    fi
+    case "${QEMU}" in true|True) report_pass "qemu-available" ;; esac
+    QEMU_TESTS="${tests}"
+    info_msg "running the QEMU only tests under $(qemu-system-aarch64 --version | head -n 1): ${tests}"
+    (
+        cd "${QEMU_DIR}" || exit 1
+        # shellcheck disable=SC2086
+        ${PIN} ./run_tests.sh $1 ${tests} | tee "${QEMU_LOG}"
+        verdicts "${QEMU_LOG}" | awk '$2 == "fail" { print $1 }' | while read -r t; do
+            info_msg "${t} (QEMU) log:"
+            cat "logs/${t}.log"
+        done
+    )
 }
 
 kvm_unit_tests_build_test() {
