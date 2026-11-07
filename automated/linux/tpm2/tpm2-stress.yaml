@@ -1,0 +1,30 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: tpm2-stress
+    description: "TPM transport under load: tpm2-tools command loops
+      (random, PCR read and extend, hash, ECC sign) in parallel for
+      SECONDS_RUN seconds while stress-ng loads the CPUs, memory, block
+      I/O and timer interrupts. Every command must succeed. Reports the
+      number of commands and failures as measurements. No TPM or no
+      tpm2-tools is a skip."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - buildroot
+        - openembedded
+        - debian
+    scope:
+        - functional
+    devices:
+        - lemans-evk
+
+params:
+    SECONDS_RUN: "600"
+    TCTI: "device:/dev/tpmrm0"
+    LOOPS: "4"
+
+run:
+    steps:
+        - cd ./automated/linux/tpm2/
+        - ./tpm2-stress.sh -s "${SECONDS_RUN}" -t "${TCTI}" -j "${LOOPS}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
