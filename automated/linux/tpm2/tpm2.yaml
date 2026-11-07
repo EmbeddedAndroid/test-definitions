@@ -1,0 +1,50 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: tpm2
+    description: "TPM 2.0 functional checks with tpm2-tools over the kernel
+      resource manager: the /dev/tpm0 and /dev/tpmrm0 nodes, capabilities,
+      the TPM self test, PCR read and extend (checked against a digest
+      computed on the host CPU), random numbers, an ECC key created,
+      loaded, used to sign and its signature verified, an NV index defined,
+      written, read back and removed, and a quote over PCRs checked with
+      its nonce. Negative cases: a tampered message must fail signature
+      verification, a quote must fail with another nonce, and reading an
+      undefined NV index must fail. Optionally, a TPM command sent by the
+      kernel at locality LOCALITY_DENIED (a locality reserved for the secure
+      world) must be refused while locality 0 keeps working, and PCR 17
+      must hold the value a secure-world locality 4 measurement leaves."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - lemans-evk
+
+params:
+    # TCTI of tpm2-tools: the in-kernel resource manager by default.
+    TCTI: "device:/dev/tpmrm0"
+    # Resettable PCR (debug PCR 16) used for the extend check.
+    PCR: "16"
+    # NV index defined and removed by the NV check (owner range).
+    NV_INDEX: "0x1500016"
+    # Expected TPM_PT_MANUFACTURER (e.g. "STM"); empty accepts any.
+    MANUFACTURER: ""
+    # Locality the normal world must be refused; the kernel driver's
+    # locality is selected through LOCALITY_FILE (debugfs). Empty skips.
+    LOCALITY_DENIED: ""
+    LOCALITY_FILE: "/sys/kernel/debug/tpm0/locality"
+    # Expected sha256 PCR 17 (hex) after the secure world's locality 4
+    # hash sequence; empty skips the check.
+    PCR17_SHA256: ""
+
+run:
+    steps:
+        - cd ./automated/linux/tpm2/
+        - ./tpm2.sh -t "${TCTI}" -p "${PCR}" -n "${NV_INDEX}" -m "${MANUFACTURER}" -L "${LOCALITY_DENIED}" -f "${LOCALITY_FILE}" -d "${PCR17_SHA256}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
