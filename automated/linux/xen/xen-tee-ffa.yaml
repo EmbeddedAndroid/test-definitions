@@ -1,0 +1,47 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: xen-tee-ffa
+    description: "OP-TEE through Xen's FF-A mediator (Xen CONFIG_FFA, OP-TEE as an
+      FF-A partition, e.g. the S-EL1 SPMC): Xen selected the FF-A
+      mediator and found the SPMC's FF-A version, dom0's FF-A driver
+      found the firmware and its OP-TEE driver bound over FF-A with
+      /dev/tee0 and /dev/teepriv0, and xtest passes in dom0 when XTEST
+      is given; a guest created with tee = ffa reaches OP-TEE, a guest
+      without it does not, and xl destroy of the FF-A guest leaves no
+      dying domain and no shared memory Xen failed to reclaim (that
+      needs an SPMC that handles VM created and destroyed messages, e.g.
+      OP-TEE with CFG_NS_VIRTUALIZATION). Skipped without Xen or when
+      Xen uses another mediator or none (REQUIRE=true fails instead);
+      the guest cases are skipped without the guest image (qcom-
+      buildroot xen_guest_ext). The guest kernel needs the FF-A
+      transport and the OP-TEE driver."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - nord-ride-embedded
+
+params:
+    # true: fail instead of skip when Xen runs without this mediator.
+    REQUIRE: "false"
+    # xtest arguments for dom0 (e.g. "1001 1004" or "-l 15"); empty skips
+    # the case (the optee-xtest definition runs the whole suite).
+    XTEST: ""
+    KERNEL: "/opt/xen-guest/Image"
+    INITRD: "/opt/xen-guest/initramfs.cpio.gz"
+    # Memory (MiB) of each guest
+    MEMORY: "256"
+    TIMEOUT: "120"
+
+run:
+    steps:
+        - cd ./automated/linux/xen/
+        - ./xen-tee.sh -m ffa -r "${REQUIRE}" -x "${XTEST}" -k "${KERNEL}" -i "${INITRD}" -s "${MEMORY}" -t "${TIMEOUT}"
+        - ../../utils/send-to-lava.sh ./output/result.txt

@@ -1,0 +1,42 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: xen-detect
+    description: "Is Linux the Xen control domain (dom0), and which Xen:
+      /sys/hypervisor/type is xen, /proc/xen/capabilities has control_d,
+      the Xen version and guest ABI capabilities are readable (and match
+      VERSION and CAPS when given), and the Xen boot banner carries
+      FINGERPRINT when given. Without Xen every case is skipped, so the
+      Xen block of a plan can run on every boot; REQUIRE_XEN=true fails
+      them instead. A devicetree that says Xen with a kernel that does not
+      fails."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - nord-ride-embedded
+
+params:
+    # true: fail instead of skip when Linux does not run on Xen.
+    REQUIRE_XEN: "false"
+    # Extended regex the Xen version (major.minor and extra) must match;
+    # empty only checks that it is readable.
+    VERSION: ""
+    # A guest ABI capability that must be listed, e.g. xen-3.0-aarch64;
+    # empty only checks that the list is not empty.
+    CAPS: ""
+    # Build fingerprint the "Xen version" banner must carry (xl dmesg);
+    # empty skips the check.
+    FINGERPRINT: ""
+
+run:
+    steps:
+        - cd ./automated/linux/xen/
+        - ./xen-detect.sh -r "${REQUIRE_XEN}" -v "${VERSION}" -c "${CAPS}" -f "${FINGERPRINT}"
+        - ../../utils/send-to-lava.sh ./output/result.txt

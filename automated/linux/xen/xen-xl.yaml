@@ -1,0 +1,44 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: xen-xl
+    description: "The Xen toolstack and guests from dom0: xenstored,
+      xen-init-dom0 and xenconsoled start; xl info, xl list (Domain-0) and
+      xl dmesg answer; a 1-vCPU guest boots and shuts down on xl shutdown;
+      PARALLEL guests created back to back each boot, are running domains
+      and shut down cleanly; xl destroy removes a running guest and its
+      memory is free again. Guest states come from each guest's console
+      (README.md), not timing. Skipped without Xen; fails without xl on
+      Xen; the guest cases are skipped without the guest kernel and
+      initramfs (qcom-buildroot xen_guest_ext installs them in
+      /opt/xen-guest)."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - nord-ride-embedded
+
+params:
+    # Guest kernel and initramfs; the init must follow the console
+    # protocol of README.md.
+    KERNEL: "/opt/xen-guest/Image"
+    INITRD: "/opt/xen-guest/initramfs.cpio.gz"
+    # Memory (MiB) of each guest, vCPUs of the parallel guests, number of
+    # parallel guests.
+    MEMORY: "256"
+    VCPUS: "2"
+    PARALLEL: "4"
+    # Seconds to wait for a guest's ready line and for a shutdown.
+    TIMEOUT: "120"
+
+run:
+    steps:
+        - cd ./automated/linux/xen/
+        - ./xen-xl.sh -k "${KERNEL}" -i "${INITRD}" -m "${MEMORY}" -c "${VCPUS}" -n "${PARALLEL}" -t "${TIMEOUT}"
+        - ../../utils/send-to-lava.sh ./output/result.txt

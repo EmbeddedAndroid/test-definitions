@@ -1,0 +1,34 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: xen-dom0
+    description: "Health of the Xen control domain (dom0): it has one vCPU
+      per host CPU (xl info nr_cpus, or DOM0_VCPUS), the grant table is
+      set up, hvc0 is a console, event channels are set up and bound, the
+      kernel log has no error from the Xen drivers and no warning trace
+      through Xen code, and the Xen console ring has no assertion, BUG,
+      WARN or panic. Skipped without Xen."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - openembedded
+        - buildroot
+    scope:
+        - functional
+    devices:
+        - nord-ride-embedded
+
+params:
+    # vCPUs dom0 must have; empty means one per host CPU (needs xl), e.g.
+    # set it when Xen boots with dom0_max_vcpus.
+    DOM0_VCPUS: ""
+    # Extended regex of known log lines to leave out of the two log checks.
+    IGNORE: ""
+
+run:
+    steps:
+        - cd ./automated/linux/xen/
+        - ./xen-dom0.sh -c "${DOM0_VCPUS}" -i "${IGNORE}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
