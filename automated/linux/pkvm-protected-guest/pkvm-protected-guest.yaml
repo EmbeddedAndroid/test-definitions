@@ -1,0 +1,34 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: pkvm-protected-guest
+    description: "Protected KVM guests (kvm-arm.mode=protected) with kvmtool
+                  --protected and a minimal VMM: boot, workload and shutdown,
+                  host reads of guest memory faulting or finding no secret
+                  in any page, guest accesses outside its memory exiting to
+                  the VMM, no FF-A or SMC, each against a normal guest as the
+                  negative control."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - openembedded
+    scope:
+        - functional
+    devices:
+        - eliza-evk-emmc
+
+params:
+    LKVM: ""
+    KERNEL: ""
+    INITRD: ""
+    GUEST_FP: ""
+    VCPUS: "2"
+    MEMORY: "256"
+    TIMEOUT: "90"
+
+run:
+    steps:
+        - cd ./automated/linux/pkvm-protected-guest/
+        - ./pkvm-protected-guest.sh -l "${LKVM}" ${KERNEL:+-k "${KERNEL}"} ${INITRD:+-i "${INITRD}"} ${GUEST_FP:+-f "${GUEST_FP}"} -c "${VCPUS}" -m "${MEMORY}" -t "${TIMEOUT}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
