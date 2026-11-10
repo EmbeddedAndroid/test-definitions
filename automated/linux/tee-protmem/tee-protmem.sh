@@ -12,6 +12,14 @@
 . ../../lib/sh-test-lib
 OUTPUT="$(pwd)/output"
 RESULT_FILE="${OUTPUT}/result.txt"
+ROUNDS="50"
+
+while getopts "r:h" o; do
+    case "$o" in
+        r) ROUNDS="${OPTARG}" ;;
+        h|*) echo "Usage: $0 [-r <eviction rounds>]" 1>&2; exit 1 ;;
+    esac
+done
 export RESULT_FILE
 TA_DIR="/lib/optee_armtz"
 TA="1b7d45ae-0f97-4ee8-bdeb-f05a852de180.ta"
@@ -26,13 +34,13 @@ ls -l /dev/dma_heap/ /dev/tee* || true
 cp "./ta/${TA}" "${TA_DIR}/"
 grep -qsx tee-supplicant /proc/[0-9]*/comm || info_msg "tee-supplicant is not running"
 DMESG0="$(dmesg | wc -l)"
-./tee-protmem ./data 2> "${OUTPUT}/tee-protmem.log" | tee -a "${RESULT_FILE}"
+./tee-protmem ./data "${ROUNDS}" 2> "${OUTPUT}/tee-protmem.log" | tee -a "${RESULT_FILE}"
 cat "${OUTPUT}/tee-protmem.log"
 # tee-protmem stops at a setup error: no case may go unreported.
 for c in heap-present protected-alloc protected-mmap-denied system-mmap \
          system-register-fd-refused protected-register-fd ta-refuses-ns-output \
          secure-decrypt protected-host-read-hidden kcore-scan-control \
-         protected-data-intact; do
+         protected-data-intact protected-data-evict; do
     grep -q "^${c} " "${RESULT_FILE}" || report_fail "${c}"
 done
 dmesg | tail -n "+$((DMESG0 + 1))"

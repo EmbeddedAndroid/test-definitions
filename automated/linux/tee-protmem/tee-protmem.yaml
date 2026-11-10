@@ -7,7 +7,8 @@ metadata:
                   non-secure output, frame digests computed in the TEE, the
                   host unable to map it or to read it (scan of all RAM
                   through /proc/kcore, with a system heap buffer as the
-                  control), and the data intact afterwards."
+                  control), and the data intact afterwards, also when the
+                  CPU caches are evicted right after a fresh lend."
     maintainer:
         - tyler.baker@oss.qualcomm.com
     os:
@@ -19,8 +20,11 @@ metadata:
     devices:
         - eliza-evk-emmc
 
+params:
+    ROUNDS: "50"
+
 run:
     steps:
         - cd ./automated/linux/tee-protmem/
-        - ./tee-protmem.sh
+        - ./tee-protmem.sh -r "${ROUNDS}"
         - ../../utils/send-to-lava.sh ./output/result.txt

@@ -108,6 +108,84 @@ out:
 	return res;
 }
 
+#define LINE		64
+#define CHECK_CHUNK	4096
+
+static TEE_Result cmd_check(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
+{
+	const uint8_t *prot = p[1].memref.buffer;
+	TEE_OperationHandle op = TEE_HANDLE_NULL;
+	TEE_ObjectHandle key = TEE_HANDLE_NULL;
+	uint32_t diff = 0, zero = 0, first = UINT32_MAX;
+	TEE_Attribute attr = { };
+	TEE_Result res = TEE_SUCCESS;
+	size_t off = 0, len = 0, i = 0, k = 0;
+	uint8_t *plain = NULL;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_VALUE_OUTPUT,
+				     TEE_PARAM_TYPE_VALUE_OUTPUT))
+		return TEE_ERROR_BAD_PARAMETERS;
+	len = p[1].memref.size;
+	if (!len || len % CHECK_CHUNK || p[0].memref.size != len)
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (TEE_CheckMemoryAccessRights(TEE_MEMORY_ACCESS_READ |
+					TEE_MEMORY_ACCESS_SECURE |
+					TEE_MEMORY_ACCESS_ANY_OWNER,
+					p[1].memref.buffer, len))
+		return TEE_ERROR_SECURITY;
+
+	plain = TEE_Malloc(CHECK_CHUNK, TEE_MALLOC_FILL_ZERO);
+	if (!plain)
+		return TEE_ERROR_OUT_OF_MEMORY;
+	res = TEE_AllocateOperation(&op, TEE_ALG_AES_CTR, TEE_MODE_DECRYPT, 128);
+	if (res)
+		goto out;
+	res = TEE_AllocateTransientObject(TEE_TYPE_AES, 128, &key);
+	if (res)
+		goto out;
+	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, stream_key,
+			     sizeof(stream_key));
+	res = TEE_PopulateTransientObject(key, &attr, 1);
+	if (res)
+		goto out;
+	res = TEE_SetOperationKey(op, key);
+	if (res)
+		goto out;
+	TEE_CipherInit(op, stream_iv, sizeof(stream_iv));
+	for (off = 0; off < len && !res; off += CHECK_CHUNK) {
+		size_t olen = CHECK_CHUNK;
+
+		res = TEE_CipherUpdate(op, (const uint8_t *)p[0].memref.buffer +
+				       off, CHECK_CHUNK, plain, &olen);
+		if (res || olen != CHECK_CHUNK) {
+			res = res ? res : TEE_ERROR_GENERIC;
+			break;
+		}
+		for (i = 0; i < CHECK_CHUNK; i += LINE) {
+			if (!TEE_MemCompare(prot + off + i, plain + i, LINE))
+				continue;
+			diff++;
+			if (first == UINT32_MAX)
+				first = off + i;
+			for (k = 0; k < LINE && !prot[off + i + k]; k++)
+				;
+			if (k == LINE)
+				zero++;
+		}
+	}
+	p[2].value.a = diff;
+	p[2].value.b = zero;
+	p[3].value.a = first;
+	p[3].value.b = len / LINE;
+out:
+	TEE_Free(plain);
+	TEE_FreeTransientObject(key);
+	TEE_FreeOperation(op);
+	return res;
+}
+
 static TEE_Result cmd_digest(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 {
 	TEE_Result res = TEE_SUCCESS;
@@ -153,6 +231,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *ctx __unused, uint32_t cmd,
 		return cmd_decrypt(types, p);
 	case SECVID_CMD_DIGEST:
 		return cmd_digest(types, p);
+	case SECVID_CMD_CHECK:
+		return cmd_check(types, p);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}

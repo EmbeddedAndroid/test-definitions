@@ -24,11 +24,22 @@
  *                          to a system heap buffer (the probe works)
  *   protected-data-intact  the TA's digests of the buffer after the scan
  *                          still match
+ *   protected-data-evict   <rounds> times (default 50): a fresh protected
+ *                          buffer (the pool is lent anew), decrypt, evict
+ *                          the CPU caches by reading 128 MiB, and the
+ *                          TA's digests still match: no line the host
+ *                          left dirty before the lend is written back
+ *                          over the TA's data
+ *
+ * When the data does not match, the TA's check command reports how many
+ * 64-byte lines differ and how many of those are all zero (never what
+ * they hold).
  *
  * The data dir holds stream.enc (ciphertext), stream.sha256 (one hex
  * digest per frame), stream.info ("<frame size> <frames>") and marker.x,
  * a 32-byte marker that occurs in every plaintext page, XORed with 0xa5 so
  * that the marker itself never sits in host memory unless found.
+ * Usage: tee-protmem <data dir> [rounds]
  * Output: "<case> pass|fail" lines on stdout, details on stderr.
  */
 #define _GNU_SOURCE
@@ -53,6 +64,8 @@
 
 #define SECVID_CMD_DECRYPT	0
 #define SECVID_CMD_DIGEST	1
+#define SECVID_CMD_CHECK	2
+#define EVICT_LEN	(128UL << 20)
 #define TEE_ERROR_SECURITY	0xffff000f
 
 /* 1b7d45ae-0f97-4ee8-bdeb-f05a852de180, octets in RFC 4122 order */
@@ -173,6 +186,29 @@ static int digests_match(const uint8_t *dg, const char *ref, uint32_t frames)
 	return 1;
 }
 
+/* The TA's line check of the protected buffer <pid> against ciphertext <cid>. */
+static void check(int tee, uint32_t session, int cid, int pid, size_t len,
+		  const char *what)
+{
+	struct invoke iv;
+	uint32_t ret = 0;
+
+	memset(&iv, 0, sizeof(iv));
+	memref(&iv.params[0], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT, cid, len);
+	memref(&iv.params[1], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT, pid, len);
+	iv.params[2].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT;
+	iv.params[3].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT;
+	if (invoke(tee, session, SECVID_CMD_CHECK, &iv, &ret) || ret) {
+		fprintf(stderr, "%s: check failed, ret 0x%x\n", what, ret);
+		return;
+	}
+	fprintf(stderr, "%s: %llu of %llu lines differ, %llu of them zero, first at 0x%llx\n",
+		what, (unsigned long long)iv.params[2].a,
+		(unsigned long long)iv.params[3].b,
+		(unsigned long long)iv.params[2].b,
+		(unsigned long long)iv.params[3].a);
+}
+
 /*
  * Count the marker in every RAM segment of /proc/kcore. kcore reads RAM
  * with copy_from_kernel_nofault(), so a page the host stage-2 no longer
@@ -241,10 +277,12 @@ int main(int argc, char **argv)
 	const size_t dg_len = MAX_FRAMES * 32;
 	char *ref, *info;
 	struct invoke iv;
-	long hits;
+	long hits, rounds = 50, bad = 0;
+	volatile uint8_t *evict;
+	uint64_t sink = 0;
 
-	if (argc != 2) {
-		fprintf(stderr, "usage: %s <data dir>\n", argv[0]);
+	if (argc < 2 || argc > 3 || (argc == 3 && (rounds = atol(argv[2])) <= 0)) {
+		fprintf(stderr, "usage: %s <data dir> [rounds]\n", argv[0]);
 		return 1;
 	}
 	enc = read_file(argv[1], "stream.enc", &enc_len);
@@ -365,9 +403,64 @@ int main(int argc, char **argv)
 	iv.params[2].a = frame_size;
 	iv.params[2].b = frames;
 	rc = invoke(tee, session, SECVID_CMD_DIGEST, &iv, &ret);
-	result("protected-data-intact", !rc && !ret && digests_match(dg, ref, frames));
+	rc = !rc && !ret && digests_match(dg, ref, frames);
+	if (!rc)
+		check(tee, session, cid, pid, enc_len, "after the scan");
+	result("protected-data-intact", rc);
 
+	/* Drop the last buffer so that every round lends the pool anew. */
 	close(pshm);
 	close(pfd);
+	evict = mmap(NULL, EVICT_LEN, PROT_READ | PROT_WRITE,
+		     MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE, -1, 0);
+	if (evict == MAP_FAILED) {
+		perror("mmap");
+		return 1;
+	}
+	for (size_t o = 0; o < EVICT_LEN; o += 64)
+		evict[o] = (uint8_t)o;
+	for (long r = 0; r < rounds; r++) {
+		pfd = heap_alloc(PROT_HEAP, enc_len);
+		pshm = pfd < 0 ? -1 : register_fd(tee, pfd, &pid);
+		if (pshm < 0) {
+			fprintf(stderr, "round %ld: alloc/register: %s\n", r, strerror(errno));
+			bad++;
+			break;
+		}
+		memset(&iv, 0, sizeof(iv));
+		memref(&iv.params[0], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT, cid, enc_len);
+		memref(&iv.params[1], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT, pid, enc_len);
+		memref(&iv.params[2], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT, did, dg_len);
+		iv.params[3].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT;
+		iv.params[3].a = frame_size;
+		iv.params[3].b = frames;
+		rc = invoke(tee, session, SECVID_CMD_DECRYPT, &iv, &ret);
+		if (rc || ret || !digests_match(dg, ref, frames)) {
+			fprintf(stderr, "round %ld: decrypt ret 0x%x\n", r, ret);
+			bad++;
+		} else {
+			for (size_t o = 0; o < EVICT_LEN; o += 64)
+				sink += evict[o];
+			memset(&iv, 0, sizeof(iv));
+			memref(&iv.params[0], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT, pid, enc_len);
+			memref(&iv.params[1], TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT, did, dg_len);
+			iv.params[2].attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT;
+			iv.params[2].a = frame_size;
+			iv.params[2].b = frames;
+			rc = invoke(tee, session, SECVID_CMD_DIGEST, &iv, &ret);
+			if (rc || ret || !digests_match(dg, ref, frames)) {
+				char what[32];
+
+				snprintf(what, sizeof(what), "round %ld", r);
+				check(tee, session, cid, pid, enc_len, what);
+				bad++;
+			}
+		}
+		close(pshm);
+		close(pfd);
+	}
+	fprintf(stderr, "evict: %ld of %ld rounds lost data (sink %llu)\n", bad, rounds,
+		(unsigned long long)sink);
+	result("protected-data-evict", !bad);
 	return 0;
 }

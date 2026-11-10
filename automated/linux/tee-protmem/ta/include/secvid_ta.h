@@ -30,4 +30,12 @@
  */
 #define SECVID_CMD_DIGEST	1
 
+/*
+ * [in] ciphertext, [in] protected buffer, [out] value a: 64-byte lines
+ * that differ from the plaintext, b: how many of those are all zero,
+ * [out] value a: offset of the first differing line (~0 if none),
+ * b: lines compared. Says how the buffer differs, never what it holds.
+ */
+#define SECVID_CMD_CHECK	2
+
 #endif
