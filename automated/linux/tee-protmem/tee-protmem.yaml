@@ -1,0 +1,26 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: tee-protmem
+    description: "Secure video with protected buffers on OP-TEE over FF-A:
+                  a TEE protected-memory heap buffer (lent to OP-TEE), an
+                  encrypted stream decrypted into it by a TA that refuses
+                  non-secure output, frame digests computed in the TEE, the
+                  host unable to map it or to read it (scan of all RAM
+                  through /proc/kcore, with a system heap buffer as the
+                  control), and the data intact afterwards."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - openembedded
+    scope:
+        - functional
+    devices:
+        - eliza-evk-emmc
+
+run:
+    steps:
+        - cd ./automated/linux/tee-protmem/
+        - ./tee-protmem.sh
+        - ../../utils/send-to-lava.sh ./output/result.txt
