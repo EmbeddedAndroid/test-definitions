@@ -38,4 +38,17 @@
  */
 #define SECVID_CMD_CHECK	2
 
+/*
+ * Mean squared error, in thousandths, between the first <len> bytes of a
+ * secure buffer (a decoded frame's luma) and the same bytes of a
+ * ciphertext decrypted inside the TA (the source frame): says how close
+ * a secure encode and decode came, never what the frames hold.
+ *
+ * [in]  memref  ciphertext of the source frame (non-secure)
+ * [in]  memref  decoded frame (secure)
+ * [out] value   a: MSE * 1000, b: bytes compared
+ * [in]  value   a: len
+ */
+#define SECVID_CMD_MSE		3
+
 #endif

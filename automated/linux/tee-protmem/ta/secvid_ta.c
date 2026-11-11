@@ -186,6 +186,67 @@ out:
 	return res;
 }
 
+static TEE_Result cmd_mse(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
+{
+	const uint8_t *dec = p[1].memref.buffer;
+	TEE_OperationHandle op = TEE_HANDLE_NULL;
+	TEE_ObjectHandle key = TEE_HANDLE_NULL;
+	TEE_Attribute attr = { };
+	TEE_Result res = TEE_SUCCESS;
+	size_t len = 0, olen = 0, i = 0;
+	uint8_t *plain = NULL;
+	uint64_t sse = 0;
+
+	if (types != TEE_PARAM_TYPES(TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_MEMREF_INPUT,
+				     TEE_PARAM_TYPE_VALUE_OUTPUT,
+				     TEE_PARAM_TYPE_VALUE_INPUT))
+		return TEE_ERROR_BAD_PARAMETERS;
+	len = p[3].value.a;
+	if (!len || p[0].memref.size < len || p[1].memref.size < len)
+		return TEE_ERROR_BAD_PARAMETERS;
+	if (TEE_CheckMemoryAccessRights(TEE_MEMORY_ACCESS_READ |
+					TEE_MEMORY_ACCESS_SECURE |
+					TEE_MEMORY_ACCESS_ANY_OWNER,
+					p[1].memref.buffer, len))
+		return TEE_ERROR_SECURITY;
+
+	plain = TEE_Malloc(len, TEE_MALLOC_FILL_ZERO);
+	if (!plain)
+		return TEE_ERROR_OUT_OF_MEMORY;
+	res = TEE_AllocateOperation(&op, TEE_ALG_AES_CTR, TEE_MODE_DECRYPT, 128);
+	if (res)
+		goto out;
+	res = TEE_AllocateTransientObject(TEE_TYPE_AES, 128, &key);
+	if (res)
+		goto out;
+	TEE_InitRefAttribute(&attr, TEE_ATTR_SECRET_VALUE, stream_key,
+			     sizeof(stream_key));
+	res = TEE_PopulateTransientObject(key, &attr, 1);
+	if (res)
+		goto out;
+	res = TEE_SetOperationKey(op, key);
+	if (res)
+		goto out;
+	TEE_CipherInit(op, stream_iv, sizeof(stream_iv));
+	olen = len;
+	res = TEE_CipherDoFinal(op, p[0].memref.buffer, len, plain, &olen);
+	if (res)
+		goto out;
+	for (i = 0; i < len; i++) {
+		int d = (int)dec[i] - (int)plain[i];
+
+		sse += (uint64_t)(d * d);
+	}
+	p[2].value.a = (uint32_t)(sse * 1000 / len);
+	p[2].value.b = len;
+out:
+	TEE_Free(plain);
+	TEE_FreeTransientObject(key);
+	TEE_FreeOperation(op);
+	return res;
+}
+
 static TEE_Result cmd_digest(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 {
 	TEE_Result res = TEE_SUCCESS;
@@ -233,6 +294,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *ctx __unused, uint32_t cmd,
 		return cmd_digest(types, p);
 	case SECVID_CMD_CHECK:
 		return cmd_check(types, p);
+	case SECVID_CMD_MSE:
+		return cmd_mse(types, p);
 	default:
 		return TEE_ERROR_NOT_SUPPORTED;
 	}
