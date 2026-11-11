@@ -1,0 +1,32 @@
+metadata:
+    format: Lava-Test Test Definition 1.0
+    name: iris-secure
+    description: "Iris secure decode and encode in protected DMA-bufs (TEE
+                  protected heap, lent to OP-TEE over FF-A) through the
+                  codec's secure context banks, which the pKVM hypervisor
+                  owns on the MMU-500: a secure decode whose frame digests,
+                  computed in a TA, equal a non-secure decode's; a secure
+                  encode decoded back in a secure session with the PSNR
+                  computed in the TA; the driver refusing buffers of the
+                  wrong kind; the hypervisor refusing unlent memory in a
+                  secure bank; and the SMMU faulting a non-secure session's
+                  writes to protected memory, which stays unchanged."
+    maintainer:
+        - tyler.baker@oss.qualcomm.com
+    os:
+        - debian
+        - ubuntu
+        - openembedded
+    scope:
+        - functional
+    devices:
+        - eliza-evk-emmc
+
+params:
+    MIN_PSNR: "30"
+
+run:
+    steps:
+        - cd ./automated/linux/iris-secure/
+        - ./iris-secure.sh -p "${MIN_PSNR}"
+        - ../../utils/send-to-lava.sh /tmp/iris-secure/output/result.txt
