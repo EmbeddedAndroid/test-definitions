@@ -5,7 +5,8 @@
 # Secure video with protected buffers on OP-TEE over FF-A (see
 # tee-protmem.c for the cases): installs the secvid TA, runs tee-protmem
 # on the stream in ./data and checks that the host logged no oops. Needs
-# root, OP-TEE with CFG_CORE_DYN_PROTMEM=y and Linux with the TEE
+# root, OP-TEE with CFG_CORE_DYN_PROTMEM=y and CFG_CACHE_API=y (the TA
+# cleans what it writes for non-coherent devices) and Linux with the TEE
 # protected-memory heap and /proc/kcore.
 
 # shellcheck disable=SC1091

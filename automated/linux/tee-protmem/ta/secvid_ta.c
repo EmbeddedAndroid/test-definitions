@@ -61,6 +61,21 @@ static TEE_Result check_frames(TEE_Param *p, TEE_Param *v, uint32_t access)
 	return TEE_SUCCESS;
 }
 
+/*
+ * Protected buffers are cacheable in the TA and the codec reads and writes
+ * them without snooping: push what the TA wrote to memory, and drop stale
+ * lines before reading what a device wrote.
+ */
+static TEE_Result sync_for_device(void *buf, size_t len)
+{
+	return TEE_CacheFlush(buf, len);
+}
+
+static TEE_Result sync_for_cpu(void *buf, size_t len)
+{
+	return TEE_CacheInvalidate(buf, len);
+}
+
 static TEE_Result cmd_decrypt(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 {
 	TEE_OperationHandle op = TEE_HANDLE_NULL;
@@ -100,6 +115,9 @@ static TEE_Result cmd_decrypt(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 				p[1].memref.buffer, &len);
 	if (res)
 		goto out;
+	res = sync_for_device(p[1].memref.buffer, p[1].memref.size);
+	if (res)
+		goto out;
 	res = digest_frames(p[1].memref.buffer, p[3].value.a, p[3].value.b,
 			    &p[2]);
 out:
@@ -135,6 +153,9 @@ static TEE_Result cmd_check(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 					TEE_MEMORY_ACCESS_ANY_OWNER,
 					p[1].memref.buffer, len))
 		return TEE_ERROR_SECURITY;
+	res = sync_for_cpu(p[1].memref.buffer, len);
+	if (res)
+		return res;
 
 	plain = TEE_Malloc(CHECK_CHUNK, TEE_MALLOC_FILL_ZERO);
 	if (!plain)
@@ -210,6 +231,9 @@ static TEE_Result cmd_mse(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 					TEE_MEMORY_ACCESS_ANY_OWNER,
 					p[1].memref.buffer, len))
 		return TEE_ERROR_SECURITY;
+	res = sync_for_cpu(p[1].memref.buffer, len);
+	if (res)
+		return res;
 
 	plain = TEE_Malloc(len, TEE_MALLOC_FILL_ZERO);
 	if (!plain)
@@ -257,6 +281,9 @@ static TEE_Result cmd_digest(uint32_t types, TEE_Param p[TEE_NUM_PARAMS])
 				     TEE_PARAM_TYPE_NONE))
 		return TEE_ERROR_BAD_PARAMETERS;
 	res = check_frames(&p[0], &p[2], TEE_MEMORY_ACCESS_READ);
+	if (res)
+		return res;
+	res = sync_for_cpu(p[0].memref.buffer, p[0].memref.size);
 	if (res)
 		return res;
 	return digest_frames(p[0].memref.buffer, p[2].value.a, p[2].value.b,
