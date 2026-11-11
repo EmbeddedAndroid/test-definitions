@@ -28,6 +28,19 @@
  *                          into a protected buffer the TA filled: the SMMU
  *                          shadow stage 2 faults the codec's writes and the
  *                          TA finds the buffer unchanged
+ *   aimed-dma-host-page    control for the aimed cases below: the first
+ *                          page of a non-secure decode's frames aimed (test
+ *                          knob, codec's host IOMMU domain) at a page the
+ *                          host owns: no shadow fault, the codec writes it
+ *   hyp-data-dma-read-blocked, hyp-data-dma-write-blocked,
+ *   iommu-pool-dma-read-blocked, iommu-pool-dma-write-blocked
+ *                          the same, aimed at a page of hypervisor data and
+ *                          at the shadow stage 2's level 1 table (IOMMU
+ *                          pool): the input (codec reads) and the frames
+ *                          (codec writes) fault in the shadow bank and the
+ *                          hypervisor's checksum of the page is unchanged;
+ *                          a write case is skipped if its read reached the
+ *                          page, so a kernel with the hole is not corrupted
  *   other-dma-unaffected   (iris-secure.sh) the faults leave the other
  *                          masters behind the SMMU working
  *
@@ -60,6 +73,8 @@
 #define SYS_HEAP	"/dev/dma_heap/system"
 #define CMA_HEAP	"/dev/dma_heap/default_cma_region"
 #define KNOB		"/sys/module/qcom_iris/parameters/secure_test_skip_heap_check"
+#define AIM		"/sys/module/qcom_iris/parameters/secure_test_dma_target"
+#define AIM_WRITE	"/sys/module/qcom_iris/parameters/secure_test_dma_write"
 #define GUARD		"/sys/kernel/debug/arm_smmu_pkvm"
 #define CID_SECURE	(V4L2_CID_USER_BASE | 0x1f00)
 #define MAX_AU		256
@@ -872,6 +887,171 @@ static int mse_frame(struct decode *d, int fd, size_t used, int n)
 	return 0;
 }
 
+/* ---- host DMA aimed at memory the host does not own ---- */
+static int write_param(const char *path, unsigned long long v)
+{
+	char b[32];
+	int fd = open(path, O_WRONLY), n, rc;
+
+	if (fd < 0)
+		return -1;
+	n = snprintf(b, sizeof(b), "%llu", v);
+	rc = write(fd, b, n) == n ? 0 : -1;
+	close(fd);
+	return rc;
+}
+
+/* The hypervisor's probe page <name> ("data" or "pool"): address, checksum */
+static int probe_read(const char *name, unsigned long long *pa, unsigned long long *sum)
+{
+	char line[256], n[16];
+	FILE *f = fopen(GUARD, "r");
+	int found = 0;
+
+	if (!f)
+		return -1;
+	while (!found && fgets(line, sizeof(line), f))
+		found = sscanf(line, "probe %15s pa %llx sum %llx", n, pa, sum) == 3 &&
+			!strcmp(n, name);
+	fclose(f);
+	return found ? 0 : -1;
+}
+
+/*
+ * A non-secure decode with the first page of its input (write = 0) or its
+ * frames (write = 1) aimed at physical page <pa>; the shadow bank faults it
+ * took in *faults.
+ */
+static int aimed_decode(const char *tag, unsigned long long pa, int write,
+			unsigned long long *faults)
+{
+	struct decode d = { .cap_heap = SYS_HEAP, .frame = NULL };
+	unsigned long long f0, f1, far0, far1;
+	int n;
+
+	d.nin = nau;
+	guard_report(tag, &f0, &far0);
+	if (write_param(AIM_WRITE, write) || write_param(AIM, pa)) {
+		fprintf(stderr, "%s: cannot set %s\n", tag, AIM);
+		return -1;
+	}
+	n = decode_run(&d);
+	write_param(AIM, 0);
+	write_param(AIM_WRITE, 0);
+	guard_report(tag, &f1, &far1);
+	close_fds(d.cap_fd, NBUF_CAP);
+	*faults = f1 - f0;
+	fprintf(stderr, "%s: %s aimed at %#llx: decode rc %d, %d frames, %llu shadow faults, far %#llx\n",
+		tag, write ? "frames" : "input", pa, n, d.frames, *faults, far1);
+	kmsg(tag);
+	return 0;
+}
+
+/* Physical address of the page mapped at <va> (root: /proc/self/pagemap) */
+static unsigned long long virt_to_phys(void *va)
+{
+	long psz = sysconf(_SC_PAGESIZE);
+	uint64_t e = 0;
+	int fd = open("/proc/self/pagemap", O_RDONLY);
+
+	if (fd < 0)
+		return 0;
+	if (pread(fd, &e, sizeof(e), ((uintptr_t)va / psz) * sizeof(e)) != sizeof(e))
+		e = 0;
+	close(fd);
+	if (!(e >> 63) || !(e & ((1ULL << 55) - 1)))
+		return 0;
+	return (e & ((1ULL << 55) - 1)) * psz;
+}
+
+/* Clean and invalidate to PoC: the next reads see what a device wrote */
+static void evict(void *p, size_t len)
+{
+	for (size_t o = 0; o < len; o += 64)
+		__asm__ volatile("dc civac, %0" : : "r"((char *)p + o) : "memory");
+	__asm__ volatile("dsb sy" : : : "memory");
+}
+
+static void host_dma_cases(void)
+{
+	static const char *const probe[2] = { "data", "pool" };
+	static const char *const read_case[2] = {
+		"hyp-data-dma-read-blocked", "iommu-pool-dma-read-blocked" };
+	static const char *const write_case[2] = {
+		"hyp-data-dma-write-blocked", "iommu-pool-dma-write-blocked" };
+	unsigned long long pa, sum0, sum1, faults, host_pa;
+	long psz = sysconf(_SC_PAGESIZE);
+	int i, changed = 0;
+	uint8_t *host;
+
+	if (access(AIM, W_OK) || probe_read("data", &pa, &sum0)) {
+		fprintf(stderr, "no DMA aim knob or hypervisor probes\n");
+		result("aimed-dma-host-page", "skip");
+		for (i = 0; i < 2; i++) {
+			result(read_case[i], "skip");
+			result(write_case[i], "skip");
+		}
+		return;
+	}
+
+	/*
+	 * Control: a page the host owns takes the aimed writes, unfaulted. An
+	 * anonymous locked page: pagemap gives no frame for heap mmaps (PFN
+	 * maps).
+	 */
+	host = mmap(NULL, psz, PROT_READ | PROT_WRITE,
+		    MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE | MAP_LOCKED, -1, 0);
+	if (host != MAP_FAILED) {
+		memset(host, 0xa5, psz);
+		evict(host, psz);
+		host_pa = virt_to_phys(host);
+		if (host_pa && !aimed_decode("aimed-dma-host-page", host_pa, 1, &faults)) {
+			evict(host, psz);
+			for (i = 0; i < psz; i++)
+				changed += host[i] != 0xa5;
+			fprintf(stderr, "aimed-dma-host-page: page %#llx: %d of %ld bytes written\n",
+				host_pa, changed, psz);
+			result("aimed-dma-host-page", !faults && changed ? "pass" : "fail");
+		} else {
+			fprintf(stderr, "aimed-dma-host-page: no physical address\n");
+			result("aimed-dma-host-page", "fail");
+		}
+		munmap(host, psz);
+	} else {
+		result("aimed-dma-host-page", "fail");
+	}
+
+	for (i = 0; i < 2; i++) {
+		int ok;
+
+		if (probe_read(probe[i], &pa, &sum0) ||
+		    aimed_decode(read_case[i], pa, 0, &faults) ||
+		    probe_read(probe[i], &pa, &sum1)) {
+			result(read_case[i], "fail");
+			result(write_case[i], "skip");
+			continue;
+		}
+		ok = faults > 0 && sum0 == sum1;
+		fprintf(stderr, "%s: %s page %#llx sum %#llx -> %#llx\n", read_case[i],
+			probe[i], pa, sum0, sum1);
+		result(read_case[i], ok ? "pass" : "fail");
+		if (!faults) {
+			fprintf(stderr, "%s: the codec read the page: no write attempt\n",
+				write_case[i]);
+			result(write_case[i], "skip");
+			continue;
+		}
+		if (aimed_decode(write_case[i], pa, 1, &faults) ||
+		    probe_read(probe[i], &pa, &sum1)) {
+			result(write_case[i], "fail");
+			continue;
+		}
+		fprintf(stderr, "%s: %s page %#llx sum %#llx -> %#llx\n", write_case[i],
+			probe[i], pa, sum0, sum1);
+		result(write_case[i], faults > 0 && sum0 == sum1 ? "pass" : "fail");
+	}
+}
+
 int main(int argc, char **argv)
 {
 	static struct decode ref, sec, enc_dec, neg;
@@ -1050,5 +1230,6 @@ int main(int argc, char **argv)
 	close_fds(neg.cap_fd, NBUF_CAP);
 	knob(0);
 done:
+	host_dma_cases();
 	return 0;
 }

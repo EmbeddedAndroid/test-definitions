@@ -110,7 +110,9 @@ echo "=== iris-secure details"
 cat "${OUTPUT}/iris-secure.out"
 grep -E "^[a-z-]+ (pass|fail|skip)$" "${OUTPUT}/iris-secure.out" >> "${RESULT_FILE}" || true
 for c in ref-decode secure-decode secure-encode nonsecure-protected-refused \
-         secure-unprotected-refused hyp-refuses-unlent nonsecure-dma-blocked; do
+         secure-unprotected-refused hyp-refuses-unlent nonsecure-dma-blocked \
+         aimed-dma-host-page hyp-data-dma-read-blocked hyp-data-dma-write-blocked \
+         iommu-pool-dma-read-blocked iommu-pool-dma-write-blocked; do
     grep -q "^${c} " "${RESULT_FILE}" || report_fail "${c}"
 done
 cat /sys/kernel/debug/arm_smmu_pkvm || true
